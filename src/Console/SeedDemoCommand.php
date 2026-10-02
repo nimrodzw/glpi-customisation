@@ -105,15 +105,28 @@ class SeedDemoCommand extends AbstractCommand
         // Each phase is guarded. Half an estate is still a usable demo;
         // a run that dies on racks and leaves no tickets is not.
         $ref = [];
+        $cat = [];
         $this->step($output, 'reference data', function () use (&$ref) { $ref = $this->seedReference(); });
-        $this->step($output, 'server estate',  fn() => $this->seedServers($locations, $ref));
-        $this->step($output, 'workstations and screens', fn() => $this->seedWorkstations($locations, $users, $ref));
+        $this->step($output, 'component catalogue', function () use (&$cat, &$ref) { $cat = $this->seedComponentCatalog($ref); });
+        $this->step($output, 'server estate, specified and addressed', fn() => $this->seedServers($locations, $ref, $cat));
+        $this->step($output, 'workstations and screens', fn() => $this->seedWorkstations($locations, $users, $ref, $cat));
         $this->step($output, 'printers, network and phones', fn() => $this->seedPeripherals($locations, $ref));
+        $this->step($output, 'domains', fn() => $this->seedDomains());
+        $this->step($output, 'policy documents', fn() => $this->seedDocuments());
         $this->step($output, 'software and licensing', fn() => $this->seedSoftware($ref));
         $this->step($output, 'suppliers and contracts', fn() => $this->seedContracts());
         $this->step($output, 'service level targets', fn() => $this->seedSla());
         $this->step($output, 'knowledge base', fn() => $this->seedKnowledge());
         $this->step($output, 'problems and changes', fn() => $this->seedProblemsChanges($categories));
+
+        // Tickets are assigned to a team as well as a person, because a queue
+        // where every item belongs only to an individual cannot be reassigned
+        // when that individual is on leave.
+        foreach (DemoData::TECH_GROUPS as [$team, $isTech]) {
+            if ($isTech && ($groups[$team] ?? 0) > 0) {
+                $this->resolverGroups[] = $groups[$team];
+            }
+        }
 
         $this->seedTickets($output, $target, $users, $categories);
 
@@ -186,15 +199,39 @@ class SeedDemoCommand extends AbstractCommand
     {
         $ids = [];
         foreach (DemoData::DEPARTMENTS as $dept) {
+            // Without these flags a group exists but cannot be picked as a
+            // requester, an assignee or a notification target, so it appears
+            // nowhere in the interface and reads as missing.
             $ids[$dept] = $this->ensure(\Group::class, [
-                'name'        => $dept,
-                'entities_id' => $this->entity,
-                'is_recursive'=> 1,
-                'comment'     => DemoData::MARKER,
+                'name'         => $dept,
+                'entities_id'  => $this->entity,
+                'is_recursive' => 1,
+                'is_requester' => 1,
+                'is_assign'    => 0,
+                'is_notify'    => 1,
+                'is_manager'   => 1,
+                'is_usergroup' => 1,
+                'comment'      => 'Department. ' . DemoData::MARKER,
             ], ['name', 'entities_id']);
             $this->tally('departments');
         }
-        $o->writeln('  departments');
+
+        // Teams that work tickets, which is a different thing from the
+        // department somebody belongs to.
+        foreach (DemoData::TECH_GROUPS as [$team, $isTech]) {
+            $ids[$team] = $this->ensure(\Group::class, [
+                'name'         => $team,
+                'entities_id'  => $this->entity,
+                'is_recursive' => 1,
+                'is_requester' => 0,
+                'is_assign'    => $isTech ? 1 : 0,
+                'is_notify'    => 1,
+                'is_task'      => 1,
+                'comment'      => 'Resolver group. ' . DemoData::MARKER,
+            ], ['name', 'entities_id']);
+            $this->tally('resolver groups');
+        }
+        $o->writeln('  departments and resolver groups');
         return $ids;
     }
 
@@ -223,14 +260,43 @@ class SeedDemoCommand extends AbstractCommand
             $login = strtolower($first . '.' . $last);
             $loc   = $locNames[$i % count($locNames)];
 
+            $titles = DemoData::USER_TITLES;
+            $cats   = DemoData::USER_CATEGORIES;
+
+            // Service desk staff get an IT title; everyone else gets one
+            // drawn from the business. A directory where every third person
+            // is a Systems Administrator does not survive a glance.
+            $title = $isAgent
+                ? $titles[$i % 4]
+                : $titles[4 + (($i * 3) % (count($titles) - 4))];
+
+            $titleId = $this->ensure(\UserTitle::class,
+                ['name' => $title, 'comment' => DemoData::MARKER], ['name']);
+            $catId = $this->ensure(\UserCategory::class,
+                ['name' => $cats[$i % count($cats)], 'comment' => DemoData::MARKER], ['name']);
+
+            // Dialling codes follow the branch, because a Nairobi number on a
+            // Harare desk is the detail that makes a prospect start checking
+            // everything else.
+            $dial = ['Harare' => '+263 24', 'Bulawayo' => '+263 29', 'Johannesburg' => '+27 11',
+                     'Gaborone' => '+267 39', 'Lusaka' => '+260 21', 'Nairobi' => '+254 20',
+                     'Lagos' => '+234 1', 'Data centre' => '+27 11'][$loc] ?? '+263 24';
+
             $id = $this->ensure(\User::class, [
-                'name'         => $login,
-                'realname'     => $last,
-                'firstname'    => $first,
-                'locations_id' => max(0, $locations[$loc] ?? 0),
-                'entities_id'  => $this->entity,
-                'is_active'    => 1,
-                'comment'      => DemoData::MARKER,
+                'name'                => $login,
+                'realname'            => $last,
+                'firstname'           => $first,
+                'locations_id'        => max(0, $locations[$loc] ?? 0),
+                'usertitles_id'       => max(0, $titleId),
+                'usercategories_id'   => max(0, $catId),
+                'phone'               => sprintf('%s %03d %04d', $dial, 200 + $i, 1000 + ($i * 37) % 9000),
+                'mobile'              => sprintf('%s 7%02d %03d %03d', substr($dial, 0, 4),
+                                                 10 + ($i % 80), 100 + ($i * 13) % 900, 100 + ($i * 7) % 900),
+                'registration_number' => 'EMP-' . str_pad((string) (1000 + $i), 5, '0', STR_PAD_LEFT),
+                'begin_date'          => date('Y-m-d', strtotime('-' . (6 + ($i * 7) % 96) . ' months')),
+                'entities_id'         => $this->entity,
+                'is_active'           => 1,
+                'comment'             => DemoData::MARKER,
             ], ['name']);
 
             if ($id > 0 && !$this->dry) {
@@ -254,11 +320,83 @@ class SeedDemoCommand extends AbstractCommand
                 }
             }
 
-            $ids[] = ['id' => $id, 'agent' => $isAgent];
+            $ids[] = ['id' => $id, 'agent' => $isAgent, 'dept' => $dept];
             $this->tally('people');
         }
-        $o->writeln('  people and departments linked');
+
+        if (!$this->dry) {
+            $this->finishUsers($ids, $groups);
+        }
+        $o->writeln('  people, with titles, contact details and reporting lines');
         return $ids;
+    }
+
+    /**
+     * Reporting lines, resolver group membership and a login profile.
+     *
+     * Done after the loop because a supervisor has to exist before anyone
+     * can report to them. A directory where nobody reports to anybody reads
+     * as an import rather than an organisation, and a user with no profile
+     * cannot be picked as a technician anywhere in the interface.
+     */
+    private function finishUsers(array $ids, array $groups): void
+    {
+        $real = array_values(array_filter($ids, fn($u) => $u['id'] > 0));
+        if (count($real) < 3) {
+            return;
+        }
+
+        // Profiles are looked up by name rather than by a hardcoded id,
+        // which differs between installations.
+        $profiles = [];
+        foreach ($this->db->request([
+            'SELECT' => ['id', 'name'], 'FROM' => 'glpi_profiles',
+        ]) as $row) {
+            $profiles[$row['name']] = (int) $row['id'];
+        }
+        $techProfile = $profiles['Technician'] ?? $profiles['Admin'] ?? 0;
+        $userProfile = $profiles['Self-Service'] ?? $profiles['Observer'] ?? 0;
+
+        // The first few service desk people are the supervisors.
+        $supervisors = array_slice(array_values(array_filter($real, fn($u) => $u['agent'])), 0, 3);
+
+        foreach ($real as $i => $u) {
+            try {
+                $isAgent = $u['agent'];
+                $sup = $supervisors[$i % max(1, count($supervisors))] ?? null;
+                if ($sup && $sup['id'] !== $u['id']) {
+                    (new \User())->update(['id' => $u['id'], 'users_id_supervisor' => $sup['id']]);
+                }
+
+                $pid = $isAgent ? $techProfile : $userProfile;
+                if ($pid > 0 && !$this->db->request([
+                    'FROM'  => 'glpi_profiles_users',
+                    'WHERE' => ['users_id' => $u['id'], 'profiles_id' => $pid],
+                ])->current()) {
+                    (new \Profile_User())->add([
+                        'users_id'     => $u['id'],
+                        'profiles_id'  => $pid,
+                        'entities_id'  => $this->entity,
+                        'is_recursive' => 1,
+                    ]);
+                }
+
+                // Service desk staff also belong to a resolver group, which
+                // is what makes group assignment on a ticket meaningful.
+                if ($isAgent) {
+                    $teams = array_column(DemoData::TECH_GROUPS, 0);
+                    $team  = $teams[$i % count($teams)];
+                    if (($groups[$team] ?? 0) > 0 && !$this->db->request([
+                        'FROM'  => 'glpi_groups_users',
+                        'WHERE' => ['users_id' => $u['id'], 'groups_id' => $groups[$team]],
+                    ])->current()) {
+                        (new \Group_User())->add(['users_id' => $u['id'], 'groups_id' => $groups[$team]]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                // One person's reporting line is not worth failing the run.
+            }
+        }
     }
 
     private function seedCategories(OutputInterface $o): array
@@ -293,6 +431,8 @@ class SeedDemoCommand extends AbstractCommand
      * how the real thing arrives: a closed record accumulated over months,
      * and a handful of items currently in flight.
      */
+    private array $resolverGroups = [];
+
     private function seedTickets(OutputInterface $o, int $target, array $users, array $categories): void
     {
         $agents = array_values(array_filter($users, fn($u) => $u['agent'] && $u['id'] > 0));
@@ -365,6 +505,8 @@ class SeedDemoCommand extends AbstractCommand
             'priority'            => $urgency,
             '_users_id_requester' => $staff[random_int(0, count($staff) - 1)]['id'],
             '_users_id_assign'    => $agents[random_int(0, count($agents) - 1)]['id'],
+            '_groups_id_assign'   => $this->resolverGroups
+                                     ? $this->resolverGroups[$seq % count($this->resolverGroups)] : 0,
             '_auto_import'        => true,
         ]);
         if ($id === false) {
@@ -503,7 +645,7 @@ class SeedDemoCommand extends AbstractCommand
         }
     }
 
-    private function seedServers(array $locations, array $ref): void
+    private function seedServers(array $locations, array $ref, array $cat): void
     {
         $dc     = max(0, $locations['Data centre'] ?? 0);
         $models = array_keys(array_filter($ref['cmodel'], fn($m) => $m['type'] === 'Server'));
@@ -523,13 +665,32 @@ class SeedDemoCommand extends AbstractCommand
                 'computermodels_id'   => $model ? max(0, $ref['cmodel'][$model]['id']) : 0,
                 'manufacturers_id'    => $model ? max(0, $ref['mfg'][$ref['cmodel'][$model]['mfg']] ?? 0) : 0,
             ], ['name', 'entities_id']);
+
+            // Servers were getting no operating system at all, which only
+            // workstations received. An unspecified server is the emptiest
+            // screen in the product.
+            if ($id > 0 && !$this->dry) {
+                $serverOs = ['Windows Server 2022', 'Ubuntu Server 22.04 LTS',
+                             'Red Hat Enterprise Linux 9'][$i % 3];
+                try {
+                    (new \Item_OperatingSystem())->add([
+                        'itemtype'            => 'Computer',
+                        'items_id'            => $id,
+                        'operatingsystems_id' => max(0, $ref['os'][$serverOs] ?? 0),
+                    ]);
+                } catch (\Throwable $e) {
+                }
+            }
+
+            $this->addSpecs('Computer', $id, true, $cat, $i);
+            $this->addNetwork('Computer', $id, 'Data centre', $host, 10 + $i);
             $this->addInfocom('Computer', $id, 18 + ($i % 24), 42000 + ($i * 1500));
             $this->tally('servers');
             $i++;
         }
     }
 
-    private function seedWorkstations(array $locations, array $users, array $ref): void
+    private function seedWorkstations(array $locations, array $users, array $ref, array $cat): void
     {
         $locNames = array_keys($locations);
         $clients  = array_keys(array_filter($ref['cmodel'], fn($m) => $m['type'] !== 'Server'));
@@ -582,6 +743,8 @@ class SeedDemoCommand extends AbstractCommand
                 } catch (\Throwable $e) {
                 }
             }
+            $this->addSpecs('Computer', $id, false, $cat, $i);
+            $this->addNetwork('Computer', $id, $loc, $prefix . '-' . ($i + 1), 40 + $i);
             $this->addInfocom('Computer', $id, 6 + ($i % 40), $type === 'Laptop' ? 18500 : 12000);
             $this->tally('workstations');
         }
@@ -635,6 +798,7 @@ class SeedDemoCommand extends AbstractCommand
                     'manufacturers_id' => max(0, $ref['mfg'][$ref['pmodel'][$model]['mfg']] ?? 0),
                     'have_ethernet'    => 1,
                 ], ['name', 'entities_id']);
+                $this->addNetwork('Printer', $id, $loc, 'prn-' . strtolower(substr($loc, 0, 3)) . '-' . $tag, 100 + $i * 2 + $off);
                 $this->addInfocom('Printer', $id, 10 + ($i * 2), 28000);
                 $this->tally('printers');
             }
@@ -659,6 +823,7 @@ class SeedDemoCommand extends AbstractCommand
                     'networkequipmentmodels_id' => max(0, $ref['nmodel'][$model]['id']),
                     'manufacturers_id'          => max(0, $ref['mfg'][$ref['nmodel'][$model]['mfg']] ?? 0),
                 ], ['name', 'entities_id']);
+                $this->addNetwork('NetworkEquipment', $id, $loc, 'net-' . strtolower(substr($loc, 0, 3)) . '-' . ($j + 1), 2 + $j);
                 $this->addInfocom('NetworkEquipment', $id, 12 + $j, 34000);
                 $this->tally('network equipment');
             }
@@ -875,6 +1040,218 @@ class SeedDemoCommand extends AbstractCommand
         }
     }
 
+    /**
+     * Component catalogue. Created once, then attached to machines.
+     */
+    private function seedComponentCatalog(array $ref): array
+    {
+        $out = ['cpu' => [], 'mem' => [], 'disk' => []];
+
+        foreach (DemoData::PROCESSORS as [$name, $cores, $mhz]) {
+            $out['cpu'][$name] = ['id' => $this->ensure(\DeviceProcessor::class, [
+                'designation'      => $name,
+                'frequence'        => $mhz,
+                'frequence_default'=> $mhz,
+                'nbcores_default'  => $cores,
+                'nbthreads_default'=> $cores * 2,
+                'entities_id'      => $this->entity,
+                'comment'          => DemoData::MARKER,
+            ], ['designation']), 'cores' => $cores, 'mhz' => $mhz];
+        }
+        foreach (DemoData::MEMORY as [$name, $size, $freq]) {
+            $out['mem'][$name] = ['id' => $this->ensure(\DeviceMemory::class, [
+                'designation'  => $name,
+                'size_default' => $size,
+                'frequence'    => $freq,
+                'entities_id'  => $this->entity,
+                'comment'      => DemoData::MARKER,
+            ], ['designation']), 'size' => $size, 'freq' => $freq];
+        }
+        foreach (DemoData::DISKS as [$name, $cap, $iface]) {
+            $out['disk'][$name] = ['id' => $this->ensure(\DeviceHardDrive::class, [
+                'designation'      => $name,
+                'capacity_default' => $cap,
+                'entities_id'      => $this->entity,
+                'comment'          => DemoData::MARKER,
+            ], ['designation']), 'cap' => $cap];
+        }
+
+        $this->tally('component catalogue',
+            count($out['cpu']) + count($out['mem']) + count($out['disk']));
+        return $out;
+    }
+
+    /**
+     * Give a machine a processor, memory and storage.
+     *
+     * A server whose Components tab is empty is the point at which anyone
+     * who runs infrastructure stops believing the rest of the screen.
+     */
+    private function addSpecs(string $itemtype, int $id, bool $isServer, array $cat, int $seq): void
+    {
+        if ($this->dry || $id <= 0 || empty($cat['cpu'])) {
+            return;
+        }
+        try {
+            $cpuKeys  = array_keys($cat['cpu']);
+            $memKeys  = array_keys($cat['mem']);
+            $diskKeys = array_keys($cat['disk']);
+
+            // Server parts come from the front of each list, client parts
+            // from the back, so a laptop does not end up with 64GB of ECC.
+            $cpu  = $isServer ? $cat['cpu'][$cpuKeys[$seq % 3]]
+                              : $cat['cpu'][$cpuKeys[3 + ($seq % 2)]];
+            $mem  = $isServer ? $cat['mem'][$memKeys[2 + ($seq % 2)]]
+                              : $cat['mem'][$memKeys[$seq % 2]];
+            $disk = $isServer ? $cat['disk'][$diskKeys[2 + ($seq % 2)]]
+                              : $cat['disk'][$diskKeys[$seq % 2]];
+
+            (new \Item_DeviceProcessor())->add([
+                'itemtype' => $itemtype, 'items_id' => $id,
+                'deviceprocessors_id' => $cpu['id'], 'entities_id' => $this->entity,
+                'frequency' => $cpu['mhz'], 'nbcores' => $cpu['cores'],
+                'nbthreads' => $cpu['cores'] * 2,
+            ]);
+
+            // Two sticks, because real machines have slots populated in pairs.
+            for ($slot = 0; $slot < ($isServer ? 4 : 2); $slot++) {
+                (new \Item_DeviceMemory())->add([
+                    'itemtype' => $itemtype, 'items_id' => $id,
+                    'devicememories_id' => $mem['id'], 'entities_id' => $this->entity,
+                    'size' => $mem['size'], 'frequence' => $mem['freq'],
+                ]);
+            }
+
+            (new \Item_DeviceHardDrive())->add([
+                'itemtype' => $itemtype, 'items_id' => $id,
+                'deviceharddrives_id' => $disk['id'], 'entities_id' => $this->entity,
+                'capacity' => $disk['cap'],
+            ]);
+        } catch (\Throwable $e) {
+            // Specification detail is depth, not substance.
+        }
+    }
+
+    /**
+     * Give a device a network port, a hostname and an address.
+     *
+     * Three linked records, not one: the port carries the MAC, the name
+     * hangs off the port and the address hangs off the name. Creating only
+     * the port leaves an interface with no address, which looks like a
+     * half-finished import.
+     */
+    private function addNetwork(string $itemtype, int $id, string $site, string $host, int $octet): void
+    {
+        if ($this->dry || $id <= 0) {
+            return;
+        }
+        try {
+            $subnet = DemoData::SUBNETS[$site][0] ?? '10.0.1';
+            $mac = strtolower(implode(':', str_split(substr(md5($itemtype . $id), 0, 12), 2)));
+
+            $portId = (new \NetworkPort())->add([
+                'itemtype'           => $itemtype,
+                'items_id'           => $id,
+                'entities_id'        => $this->entity,
+                'logical_number'     => 1,
+                'name'               => 'eth0',
+                'instantiation_type' => 'NetworkPortEthernet',
+                'mac'                => $mac,
+            ]);
+            if (!$portId) {
+                return;
+            }
+
+            $nameId = (new \NetworkName())->add([
+                'itemtype'    => 'NetworkPort',
+                'items_id'    => $portId,
+                'entities_id' => $this->entity,
+                'name'        => strtolower($host),
+            ]);
+            if (!$nameId) {
+                return;
+            }
+
+            (new \IPAddress())->add([
+                'itemtype'    => 'NetworkName',
+                'items_id'    => $nameId,
+                'entities_id' => $this->entity,
+                'name'        => $subnet . '.' . max(2, min(254, $octet)),
+            ]);
+        } catch (\Throwable $e) {
+            // Addressing is depth, not substance.
+        }
+    }
+
+    /**
+     * Domains, with expiry dates.
+     *
+     * One expires inside the quarter deliberately. A lapsed domain takes
+     * mail and the customer portal down together, and it is the failure
+     * most operations managers have either had or narrowly avoided.
+     */
+    private function seedDomains(): void
+    {
+        foreach (DemoData::DOMAINS as [$name, $type, $expiresIn, $note]) {
+            $tid = $this->ensure(\DomainType::class,
+                ['name' => $type, 'entities_id' => $this->entity, 'comment' => DemoData::MARKER],
+                ['name', 'entities_id']);
+
+            $this->ensure(\Domain::class, [
+                'name'            => $name,
+                'entities_id'     => $this->entity,
+                'is_recursive'    => 1,
+                'domaintypes_id'  => max(0, $tid),
+                'date_expiration' => $expiresIn > 0
+                                     ? date('Y-m-d', strtotime("+{$expiresIn} months")) : null,
+                'comment'         => $note . '. ' . DemoData::MARKER,
+            ], ['name', 'entities_id']);
+            $this->tally('domains');
+        }
+    }
+
+    /**
+     * Policy documents, written as real files so they open rather than 404.
+     * Falls back to a record without a file if the document directory is
+     * not writable, because a listed policy still beats an empty register.
+     */
+    private function seedDocuments(): void
+    {
+        foreach (DemoData::DOCUMENTS as [$title, $category, $body]) {
+            $cid = $this->ensure(\DocumentCategory::class,
+                ['name' => $category, 'entities_id' => $this->entity, 'comment' => DemoData::MARKER],
+                ['name', 'entities_id']);
+
+            $fields = [
+                'name'                   => $title,
+                'entities_id'            => $this->entity,
+                'is_recursive'           => 1,
+                'documentcategories_id'  => max(0, $cid),
+                'comment'                => DemoData::MARKER,
+            ];
+
+            if (!$this->dry) {
+                try {
+                    $dir = GLPI_DOC_DIR . '/TXT';
+                    if (!is_dir($dir)) {
+                        mkdir($dir, 0o775, true);
+                    }
+                    $stored = 'frexcore_' . substr(md5($title), 0, 16) . '.txt';
+                    if (file_put_contents($dir . '/' . $stored, $body) !== false) {
+                        $fields['filename'] = preg_replace('/[^A-Za-z0-9. ]/', '', $title) . '.txt';
+                        $fields['filepath'] = 'TXT/' . $stored;
+                        $fields['mime']     = 'text/plain';
+                    }
+                } catch (\Throwable $e) {
+                    // Record without a file is still a record.
+                }
+            }
+
+            $this->ensure(\Document::class, $fields, ['name', 'entities_id']);
+            $this->tally('documents');
+        }
+    }
+
     // ---------------------------------------------------------------- purge
 
     private function purge(OutputInterface $o): int
@@ -911,6 +1288,15 @@ class SeedDemoCommand extends AbstractCommand
         // Order matters: records that reference others go first, so nothing
         // is left pointing at something that no longer exists.
         foreach ([
+            \Document::class             => 'glpi_documents',
+            \DocumentCategory::class     => 'glpi_documentcategories',
+            \Domain::class               => 'glpi_domains',
+            \DomainType::class           => 'glpi_domaintypes',
+            \DeviceProcessor::class      => 'glpi_deviceprocessors',
+            \DeviceMemory::class         => 'glpi_devicememories',
+            \DeviceHardDrive::class      => 'glpi_deviceharddrives',
+            \UserTitle::class            => 'glpi_usertitles',
+            \UserCategory::class         => 'glpi_usercategories',
             \Problem::class              => 'glpi_problems',
             \Change::class               => 'glpi_changes',
             \SoftwareLicense::class      => 'glpi_softwarelicenses',

@@ -525,6 +525,193 @@ final class DemoData
          'Change request'],
     ];
 
+    // ============================================================
+    // Depth
+    //
+    // The first pass gave every asset a name and an owner, which is where
+    // most demo data stops. A server with no processor, no memory, no disk
+    // and no address is a row in a list, and anyone who runs infrastructure
+    // opens one, sees empty tabs, and stops believing the rest.
+    // ============================================================
+
+    /** Job titles. A Data Protection Officer in the directory is the one a buyer looks for. */
+    public const USER_TITLES = [
+        'Head of Information Technology', 'Systems Administrator', 'IT Support Analyst',
+        'Network Engineer', 'Data Protection Officer', 'Compliance Officer',
+        'Internal Auditor', 'Branch Manager', 'Underwriter', 'Senior Underwriter',
+        'Claims Handler', 'Claims Supervisor', 'Finance Officer', 'Treasury Analyst',
+        'Human Resources Officer', 'Customer Service Agent', 'Operations Supervisor',
+    ];
+
+    public const USER_CATEGORIES = ['Permanent', 'Fixed term', 'Contractor', 'Branch staff'];
+
+    /**
+     * Groups that can be assigned work, as distinct from departments.
+     * [name, is this a technician group]
+     */
+    public const TECH_GROUPS = [
+        ['Service Desk',            true],
+        ['Infrastructure Team',     true],
+        ['Network Team',            true],
+        ['Applications Team',       true],
+        ['Information Security',    true],
+        ['Data Protection Office',  true],
+    ];
+
+    /** [processor name, cores, frequency MHz] */
+    public const PROCESSORS = [
+        ['Intel Xeon Silver 4310',  12, 2100],
+        ['Intel Xeon Gold 6338',    32, 2000],
+        ['AMD EPYC 7313',           16, 3000],
+        ['Intel Core i7-1365U',     10, 1800],
+        ['Intel Core i5-1335U',     10, 1300],
+    ];
+
+    /** [memory module, size MB, frequency] */
+    public const MEMORY = [
+        ['16GB DDR4-3200 SODIMM',  16384, '3200'],
+        ['32GB DDR4-3200 SODIMM',  32768, '3200'],
+        ['32GB DDR4-3200 ECC RDIMM', 32768, '3200'],
+        ['64GB DDR4-3200 ECC RDIMM', 65536, '3200'],
+    ];
+
+    /** [disk, capacity MB, interface] */
+    public const DISKS = [
+        ['512GB NVMe SSD',   512000,  'NVMe'],
+        ['1TB NVMe SSD',    1024000,  'NVMe'],
+        ['2TB SAS 10K',     2048000,  'SAS'],
+        ['4TB SAS 7.2K',    4096000,  'SAS'],
+    ];
+
+    /**
+     * Addressing. One subnet per site, so network ports resolve to somewhere
+     * sensible rather than to a scatter of unrelated addresses.
+     * [site, subnet prefix, gateway]
+     */
+    public const SUBNETS = [
+        'Harare'       => ['10.10.1',  '10.10.1.1'],
+        'Bulawayo'     => ['10.20.1',  '10.20.1.1'],
+        'Johannesburg' => ['10.30.1',  '10.30.1.1'],
+        'Gaborone'     => ['10.40.1',  '10.40.1.1'],
+        'Lusaka'       => ['10.50.1',  '10.50.1.1'],
+        'Nairobi'      => ['10.60.1',  '10.60.1.1'],
+        'Lagos'        => ['10.70.1',  '10.70.1.1'],
+        'Data centre'  => ['10.0.1',   '10.0.1.1'],
+    ];
+
+    /**
+     * Domains.
+     *
+     * [name, type, months until expiry, note]
+     *
+     * One expires inside the quarter on purpose. A lapsed domain takes down
+     * mail and the customer portal together, and it is the failure every
+     * operations manager in the room has either had or narrowly avoided.
+     */
+    public const DOMAINS = [
+        ['shilohfinancial.com',  'Public',   2,  'Primary public domain, mail and website'],
+        ['shilohgroup.co.zw',    'Public',   9,  'Zimbabwe trading domain'],
+        ['shilohgroup.co.za',    'Public',  14,  'South Africa trading domain'],
+        ['shiloh.local',         'Internal', 0,  'Internal Active Directory forest'],
+        ['shilohpay.co.ke',      'Public',   5,  'Kenya payments portal'],
+    ];
+
+    /**
+     * Policy documents.
+     *
+     * Short on purpose. These exist so the document register is not empty
+     * and so contracts and incidents have something to point at, which is
+     * what an auditor actually traces.
+     *
+     * [title, category, body]
+     */
+    public const DOCUMENTS = [
+        ['Information Security Policy v4.2', 'Policy',
+         "SHILOH FINANCIAL GROUP
+INFORMATION SECURITY POLICY v4.2
+
+"
+         . "1. Purpose
+To protect the confidentiality, integrity and availability of information held "
+         . "by the group, and to meet obligations under ISO 27001 and applicable data protection law.
+
+"
+         . "2. Scope
+All staff, contractors and third parties with access to group systems or data.
+
+"
+         . "3. Access control
+Access is granted on least privilege and reviewed quarterly. Privileged "
+         . "accounts require multi-factor authentication and separate credentials.
+
+"
+         . "4. Incident reporting
+Suspected incidents are reported the same day through the service "
+         . "desk. Suspected personal data breaches additionally start the notification assessment.
+
+"
+         . "5. Review
+Reviewed annually by the Head of Information Technology and the Compliance "
+         . "Officer, and after any significant incident.
+"],
+
+        ['Data Protection and Privacy Policy v2.1', 'Policy',
+         "SHILOH FINANCIAL GROUP
+DATA PROTECTION AND PRIVACY POLICY v2.1
+
+"
+         . "1. Principles
+Personal data is processed lawfully, fairly and transparently, collected for "
+         . "specified purposes, kept no longer than necessary and secured appropriately.
+
+"
+         . "2. Lawful basis
+Every processing activity has a recorded lawful basis in the processing "
+         . "register, which is maintained by the Data Protection Office.
+
+"
+         . "3. Data subject rights
+Requests for access, correction, erasure, objection and portability "
+         . "are logged through the service desk on the day of receipt so the statutory clock is "
+         . "evidenced from the correct date.
+
+"
+         . "4. Breach notification
+Assessment begins immediately on discovery. Where notification to a "
+         . "supervisory authority is required it is made within 72 hours of awareness.
+
+"
+         . "5. Processors
+No personal data is shared with a processor without a written agreement and "
+         . "a transfer assessment where the processing leaves the country of origin.
+"],
+
+        ['Incident Response Plan v3.0', 'Procedure',
+         "SHILOH FINANCIAL GROUP
+INCIDENT RESPONSE PLAN v3.0
+
+"
+         . "Phase 1 Detect. Any member of staff may raise an incident. Information Security triages "
+         . "within the response target for the assigned priority.
+
+"
+         . "Phase 2 Contain. Isolate affected systems and accounts. Preserve logs and images before "
+         . "remediation; evidence destroyed during cleanup cannot be recovered.
+
+"
+         . "Phase 3 Assess. Determine whether personal data was involved. If so, the Data Protection "
+         . "Officer owns the notification decision.
+
+"
+         . "Phase 4 Recover. Restore from known good backups and verify integrity before returning "
+         . "systems to service.
+
+"
+         . "Phase 5 Review. A post incident review is held within ten working days and its actions are "
+         . "tracked as changes.
+"],
+    ];
+
     /** Resolutions, so closed tickets do not all read the same. */
     public const RESOLUTIONS = [
         'Resolved and confirmed with the requester. No further action.',
