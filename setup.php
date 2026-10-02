@@ -65,6 +65,7 @@ function plugin_init_frexcore(): void
 
         $PLUGIN_HOOKS['dashboard_types']['frexcore'] = [Dashboard::class, 'dashboardTypes'];
         $PLUGIN_HOOKS['dashboard_cards']['frexcore'] = [Dashboard::class, 'dashboardCards'];
+        $PLUGIN_HOOKS['dashboard_palettes']['frexcore'] = [Dashboard::class, 'dashboardPalettes'];
     } catch (\Throwable $e) {
         trigger_error('FrexCore plugin init failed: ' . $e->getMessage(), E_USER_WARNING);
     }

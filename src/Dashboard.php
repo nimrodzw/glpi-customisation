@@ -50,6 +50,44 @@ class Dashboard
     }
 
     /**
+     * Colour palette for every chart on the dashboard.
+     *
+     * Upstream's default is a categorical rainbow built to separate arbitrary
+     * series. Applied to ticket status it is actively misleading: "Closed" —
+     * the one state nobody needs to act on — comes out bright magenta and
+     * dominates the chart, while "New" is a quiet blue. Colour ends up
+     * meaning nothing, which is the single loudest signal that a dashboard
+     * was assembled rather than designed.
+     *
+     * This is ordered rather than categorical, because ticket status IS
+     * ordered. It runs dark navy at the start, through teal while work is in
+     * progress, amber where something is stuck and waiting on a person, green
+     * once resolved, and pale slate for closed so finished work recedes
+     * instead of shouting.
+     *
+     * If this plugin is disabled, upstream falls back to its default palette
+     * for any name it does not recognise, so cards referencing "frexcore"
+     * degrade to stock colours rather than breaking.
+     */
+    public static function dashboardPalettes(): array
+    {
+        return [
+            'frexcore' => [
+                '#1e3d6b',  // navy      — new, unstarted
+                '#4a6694',  // slate     — awaiting approval
+                '#007f8b',  // teal deep — in progress, assigned
+                '#00a8a8',  // teal      — in progress, planned
+                '#b06000',  // amber     — pending, waiting on someone
+                '#4a9d7f',  // green     — solved
+                '#b9c6da',  // pale      — closed, recedes
+                '#8a5fa8',  // violet    — spare, for charts with more series
+                '#b3261e',  // red
+                '#c9a227',  // ochre
+            ],
+        ];
+    }
+
+    /**
      * Cards available in the card picker.
      *
      * `widgettype` names the shapes a card may be drawn as. Offering the core
