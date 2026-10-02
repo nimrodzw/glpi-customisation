@@ -172,9 +172,13 @@ class Dashboard
                        . htmlspecialchars((string) ($row['url'] ?? '#'), ENT_QUOTES) . '">'
                        . htmlspecialchars((string) ($row['name'] ?? ''), ENT_QUOTES)
                        . '</a></td>'
-                       . '<td class="frexcore-list__prio">'
+                       // The numeric level goes on the cell so the stylesheet can
+                       // colour the pill by severity. Matching the translated label
+                       // instead would break the moment a tenant runs in French.
+                       . '<td class="frexcore-list__prio" data-prio="'
+                       . (int) ($row['prio_raw'] ?? 0) . '"><span>'
                        . htmlspecialchars((string) ($row['priority'] ?? ''), ENT_QUOTES)
-                       . '</td>'
+                       . '</span></td>'
                        . '<td class="frexcore-list__age">'
                        . htmlspecialchars((string) ($row['age'] ?? ''), ENT_QUOTES)
                        . '</td>'
