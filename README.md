@@ -136,3 +136,23 @@ organisation as collapsing rather than coping.
 
 The dataset lives in `src/Demo/DemoData.php`. A prospect-specific variant is
 a copy of that file, not a fork of the seeder.
+
+## Favourite menu items
+
+The product ships seventy nine menu destinations behind six collapsed
+menus, and most people use five of them every day. A star appears on each
+menu entry on hover; starred pages are pinned to a Favourites block at the
+top of the sidebar, one click away.
+
+Favourites are stored in the browser, keyed to the signed-in user, so two
+people sharing a machine do not inherit each other's shortcuts.
+
+**Why not server side.** That would mean a database table, which would mean
+install and uninstall migrations, which would break the property that makes
+this plugin safe to switch off during an incident: nothing of it is left
+behind. Per-device favourites are the right first version. If they need to
+follow a person between devices, that is a considered change with its own
+migration rather than a default nobody chose.
+
+Storage can be absent or throw, in private windows and where site data is
+blocked, so every read and write is guarded and the menu works without it.

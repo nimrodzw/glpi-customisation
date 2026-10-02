@@ -159,10 +159,19 @@ class SeedDemoCommand extends AbstractCommand
     {
         $table = getTableForItemType($class);
 
-        // The caller names the columns that identify a record. Deriving the
-        // lookup from a fixed set instead would break on glpi_users, which
-        // does not carry entities_id the way the other tables do.
-        $where = array_intersect_key($fields, array_flip($unique));
+        // Not every dropdown is entity scoped and not every record type has
+        // a comment. Contract types and document categories are global,
+        // problems and changes have content rather than comment. Asking the
+        // schema is the only approach that does not require maintaining a
+        // list of exceptions that is wrong the moment upstream changes one.
+        $fields = $this->onlyRealColumns($table, $fields);
+        $where  = array_intersect_key($fields, array_flip($unique));
+
+        if (empty($where)) {
+            // Every identifying column was filtered out, so a lookup would
+            // match the whole table and return someone else's record.
+            $where = array_intersect_key($fields, array_flip(['name', 'designation']));
+        }
 
         $found = $this->db->request(['SELECT' => 'id', 'FROM' => $table, 'WHERE' => $where])->current();
         if ($found) {
@@ -175,6 +184,41 @@ class SeedDemoCommand extends AbstractCommand
         $item = new $class();
         $id = $item->add($fields);
         return $id === false ? -1 : (int) $id;
+    }
+
+    /** Drop any field the table does not actually have. */
+    private function onlyRealColumns(string $table, array $fields): array
+    {
+        static $cache = [];
+        foreach (array_keys($fields) as $col) {
+            $key = $table . '.' . $col;
+            if (!array_key_exists($key, $cache)) {
+                $cache[$key] = $this->db->fieldExists($table, $col, false);
+            }
+            if (!$cache[$key]) {
+                unset($fields[$col]);
+            }
+        }
+        return $fields;
+    }
+
+    /**
+     * Where this table can carry the marker.
+     *
+     * Most records use comment. Knowledge articles use answer, problems and
+     * changes use content. Returning null means the type cannot be tagged
+     * and so must not be purged by marker, because a LIKE against a column
+     * that does not exist is a fatal, and purging a table without a marker
+     * would delete records the seeder never created.
+     */
+    private function markerColumn(string $table): ?string
+    {
+        foreach (['comment', 'answer', 'content'] as $col) {
+            if ($this->db->fieldExists($table, $col, false)) {
+                return $col;
+            }
+        }
+        return null;
     }
 
     // -------------------------------------------------------------- seeding
@@ -1014,7 +1058,7 @@ class SeedDemoCommand extends AbstractCommand
         foreach (DemoData::PROBLEMS as [$title, $body, $cat]) {
             $this->ensure(\Problem::class, [
                 'name'              => $title,
-                'content'           => $body,
+                'content'           => $body . '<!-- ' . DemoData::MARKER . ' -->',
                 'entities_id'       => $this->entity,
                 'status'            => \CommonITILObject::ASSIGNED,
                 'urgency'           => 3,
@@ -1028,7 +1072,7 @@ class SeedDemoCommand extends AbstractCommand
         foreach (DemoData::CHANGES as [$title, $body, $cat]) {
             $this->ensure(\Change::class, [
                 'name'              => $title,
-                'content'           => $body,
+                'content'           => $body . '<!-- ' . DemoData::MARKER . ' -->',
                 'entities_id'       => $this->entity,
                 'status'            => \CommonITILObject::ACCEPTED,
                 'urgency'           => 3,
@@ -1328,9 +1372,11 @@ class SeedDemoCommand extends AbstractCommand
             \Location::class             => 'glpi_locations',
         ] as $class => $table) {
             $n = 0;
-            // Knowledge articles have no comment column; their marker lives
-            // in the body.
-            $col = $table === 'glpi_knowbaseitems' ? 'answer' : 'comment';
+            $col = $this->markerColumn($table);
+            if ($col === null) {
+                $o->writeln(sprintf('  %-22s skipped, nothing to match on', $table));
+                continue;
+            }
             foreach ($this->db->request([
                 'SELECT' => 'id', 'FROM' => $table,
                 'WHERE'  => [$col => ['LIKE', '%' . $m . '%']],

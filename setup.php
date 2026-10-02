@@ -31,6 +31,7 @@
  * -------------------------------------------------------------------------
  */
 
+use Glpi\Plugin\Hooks;
 use GlpiPlugin\Frexcore\Dashboard;
 
 const PLUGIN_FREXCORE_VERSION = '1.0.0';
@@ -66,6 +67,12 @@ function plugin_init_frexcore(): void
         $PLUGIN_HOOKS['dashboard_types']['frexcore'] = [Dashboard::class, 'dashboardTypes'];
         $PLUGIN_HOOKS['dashboard_cards']['frexcore'] = [Dashboard::class, 'dashboardCards'];
         $PLUGIN_HOOKS['dashboard_palettes']['frexcore'] = [Dashboard::class, 'dashboardPalettes'];
+
+        // Favourite menu items. The product ships seventy nine menu
+        // destinations behind six collapsed menus, and most people use
+        // five of them daily.
+        $PLUGIN_HOOKS[Hooks::ADD_CSS]['frexcore']        = 'css/favourites.css';
+        $PLUGIN_HOOKS[Hooks::ADD_JAVASCRIPT]['frexcore'] = 'js/favourites.js';
     } catch (\Throwable $e) {
         trigger_error('FrexCore plugin init failed: ' . $e->getMessage(), E_USER_WARNING);
     }

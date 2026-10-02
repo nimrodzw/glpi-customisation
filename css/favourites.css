@@ -1,0 +1,96 @@
+/* ------------------------------------------------------------------
+   FrexCore: favourite menu items.
+
+   Lives in the plugin rather than the platform stylesheet because the
+   markup it styles is created by the plugin's own script. Shipping the
+   two together means neither can be deployed without the other.
+   ------------------------------------------------------------------ */
+
+/* The star sits at the end of a menu row and stays out of the way until
+   the row is hovered. A column of outlined stars down an unused menu is
+   visual noise on every page of the product. */
+.fx-star {
+    border: 0;
+    background: none;
+    padding: 0 .15rem;
+    margin-left: auto;
+    line-height: 1;
+    font-size: .95rem;
+    color: #9aa8bb;
+    opacity: 0;
+    cursor: pointer;
+    transition: opacity .12s ease, color .12s ease;
+}
+
+.dropdown-item:hover .fx-star,
+.fx-star:focus-visible {
+    opacity: 1;
+}
+
+.fx-star:hover {
+    color: #00a8a8;
+}
+
+/* A star that is on stays visible, because it is now information rather
+   than an affordance. */
+.fx-star--on {
+    opacity: 1;
+    color: #00a8a8;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+/* ---- The pinned section ---- */
+
+.fx-favourites {
+    margin-bottom: .35rem;
+    padding-bottom: .35rem;
+    border-bottom: 1px solid rgba(255, 255, 255, .09);
+}
+
+.fx-favourites__head {
+    padding: .55rem .9rem .3rem;
+    font-size: .6875rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #8fa3bf;
+}
+
+/* Favourites are one click, so they are flat links rather than the
+   dropdown toggles around them. The teal edge marks the whole block as
+   the person's own rather than part of the shipped menu. */
+.fx-favourites__link {
+    display: flex !important;
+    align-items: center;
+    gap: .55rem;
+    color: #dde5f0 !important;
+    border-left: 2px solid transparent;
+}
+
+.fx-favourites__link:hover {
+    color: #ffffff !important;
+    background: rgba(255, 255, 255, .05) !important;
+    border-left-color: #00a8a8;
+}
+
+.fx-favourites__link .fx-star {
+    opacity: 0;
+}
+
+.fx-favourites__link:hover .fx-star {
+    opacity: 1;
+    color: #cfe9e9;
+}
+
+/* Collapsed sidebar: the label goes, the icon stays, and the remove
+   control would have nothing to sit beside. */
+.navbar-collapsed .fx-favourites__head,
+.navbar-collapsed .fx-favourites__link .menu-label,
+.navbar-collapsed .fx-favourites__link .fx-star {
+    display: none;
+}
