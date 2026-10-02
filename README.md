@@ -102,6 +102,29 @@ counts and renewal dates, suppliers and contracts including data processing
 agreements, service level targets by priority, a knowledge base, open
 problems and changes, and a year of ticket history behind a live queue.
 
+**Tickets carry the conversation, not just the subject.** A ticket with a
+title, an assignee and nothing else is a row in a table. What a service desk
+is actually bought for is what happens after someone presses submit, and that
+is the second screen a prospect opens. Every ticket here has a thread written
+against its own subject: the requester coming back with the detail that was
+missing, the technician saying what they found, internal notes the requester
+never sees, work logged with real durations against it, and a resolution that
+answers the specific problem rather than a line of filler.
+
+Around one ticket in six changes hands. A stolen laptop opens with the Service
+Desk, moves to Information Security once the wipe is issued, and picks up the
+Data Protection Office when the question becomes whether it is notifiable. The
+outgoing assignee comes off the record when it moves, so a handover looks like
+a handover rather than a ticket quietly accumulating six owners. Reassignments
+are written to the history, managers appear as observers where the subject
+warrants it, and a handful of items sit with a team and no individual because
+nobody has picked them up yet.
+
+Threads vary across tickets built from the same template, and open tickets
+play only as far through their thread as their age allows. A queue where every
+item is at the same stage is as much of a tell as one where every item is
+identical.
+
 A prospect clicks past the dashboard inside a minute. What decides the
 meeting is whether the next five screens hold up. Thin data behind a good
 dashboard is worse than no demo, because it teaches them the product is a

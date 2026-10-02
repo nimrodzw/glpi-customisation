@@ -138,120 +138,353 @@ final class DemoData
     ];
 
     /**
-     * Ticket templates: [category, title, body, urgency 1-5, is_request].
+     * Ticket templates.
+     *
+     * [category, title, body, urgency 1-5, is_request, owning team, thread]
      *
      * Written as things a person would actually type. Generic filler is the
      * tell that a demo is a demo, and a prospect reading three of these
      * decides whether the whole environment is real.
+     *
+     * The thread is what happens after someone presses submit. A ticket with
+     * a subject, an assignee and nothing else is a row in a table; what a
+     * service desk is actually bought for is the exchange that follows, and
+     * that is the screen a prospect opens second. Each beat is one entry on
+     * the record:
+     *
+     *   ['u',  text]            the requester comes back with something
+     *   ['t',  text]            the assigned technician replies, visible to all
+     *   ['i',  text]            an internal note, not shown to the requester
+     *   ['k',  text, minutes]   work logged against the ticket
+     *   ['x',  team, text]      handed to another team, reassigned on the record
+     *   ['j',  team, text]      a second team joins, the first stays on
+     *   ['o',  text]            a manager is added as an observer
+     *   ['s',  text]            the resolution, used when the ticket closes
+     *
+     * A kind ending in '?' is optional: it plays on roughly half of the
+     * tickets built from the template, so two tickets with the same subject
+     * do not read identically. Open tickets play only as far through the
+     * thread as their age allows, which is what leaves a live queue holding
+     * work at genuinely different stages.
      */
     public const TICKETS = [
+
         ['Data subject access request',
          'Subject access request from former policyholder',
-         'A former policyholder has asked for every record we hold on them, by email to the Harare branch. Statutory clock has started. Need the file from core banking, the claims history and any call recordings.', 4, true],
+         'A former policyholder has asked for every record we hold on them, by email to the Harare branch. Statutory clock has started. Need the file from core banking, the claims history and any call recordings.', 4, true,
+         'Data Protection Office', [
+            ['t', 'Logged and the statutory clock started from the date the request arrived at the branch rather than the date it reached this office. Confirming identity before anything is released.'],
+            ['u', 'He has sent through a copy of his ID and the old policy number. Policy was cancelled in 2023 so it will be in the archive rather than live.'],
+            ['k', 'Identity verified against the ID copy and the policy record. Extract pulled from core banking and from the claims system.', 75],
+            ['i?', 'Call recordings are held by the contact centre platform for 24 months, so the 2023 calls are already outside retention. That is a legitimate answer, not a gap, but it needs saying in the response so it does not look like withholding.'],
+            ['t', 'Extract is assembled. Third party names in the claims correspondence have been redacted, which the Act allows where disclosing them would identify someone who has not consented.'],
+            ['u?', 'Understood on the redactions. Please send it to the address on the request and copy me.'],
+            ['s', 'Response issued within the statutory period with the extract, the retention position on call recordings, and a note of the redactions and the basis for them. Evidence of the response filed against the request register.'],
+         ]],
 
         ['Personal data breach',
          'Claims schedule emailed to the wrong broker',
-         'A claims schedule with 140 policyholder names and ID numbers went to the wrong broker address. Recall attempted and failed. Needs breach assessment and a decision on notifying the regulator within 72 hours.', 5, false],
+         'A claims schedule with 140 policyholder names and ID numbers went to the wrong broker address. Recall attempted and failed. Needs breach assessment and a decision on notifying the regulator within 72 hours.', 5, false,
+         'Information Security', [
+            ['i', 'Containment first, assessment second. Mail trace requested to confirm the message was delivered and opened rather than only sent.'],
+            ['t', 'Trace confirms a single delivery to one external recipient. No onward forwarding visible from our side. The receiving domain belongs to a broker we hold an agreement with, which changes the risk picture but not the obligation.'],
+            ['x', 'Data Protection Office', 'Containment is done and the technical facts are established. Handing the assessment and the notification decision to the Data Protection Office, who own the 72 hour clock. Information Security stays available for the forensic side.'],
+            ['o', 'Head of Compliance added as an observer. A breach that may be notifiable should not be the first thing they hear about after the decision has been taken.'],
+            ['k', 'Severity assessed against the criteria: 140 data subjects, identity numbers included, single known recipient under contract, written deletion confirmation obtained.', 120],
+            ['u?', 'The broker has replied in writing confirming the message was deleted and not opened by anyone else in their office.'],
+            ['s', 'Assessed as not meeting the threshold for regulator notification, on the basis of a single identified recipient under a data processing agreement, written confirmation of deletion, and no evidence of onward disclosure. Recorded in the breach register with the reasoning, which is the part that matters if the regulator asks later. Sending controls reviewed as a separate change.'],
+         ]],
 
         ['Right to erasure request',
          'Erasure request, marketing contact list',
-         'Customer has withdrawn consent and asked to be removed from all marketing. Need to confirm deletion across the CRM, the mailing platform and any backups still in retention.', 3, true],
+         'Customer has withdrawn consent and asked to be removed from all marketing. Need to confirm deletion across the CRM, the mailing platform and any backups still in retention.', 3, true,
+         'Data Protection Office', [
+            ['t', 'Consent withdrawal recorded. Removing from the CRM marketing flags and the mailing platform. Note that erasure of marketing consent does not reach the policy record, which we are required to keep.'],
+            ['k', 'Suppressed in the mailing platform and marketing flags cleared in the CRM.', 30],
+            ['i?', 'Backups are the usual difficulty. They cycle out on a 35 day rotation and selective deletion inside a backup set is not practical, so the position recorded is suppression now and expiry by rotation, documented rather than claimed as immediate.'],
+            ['t', 'Removed from all active marketing. The address is on the suppression list so a future import cannot quietly reinstate it.'],
+            ['s', 'Marketing consent withdrawn and suppression applied across the CRM and the mailing platform. Retention of the underlying policy record explained to the customer with the statutory basis. Backup position documented.'],
+         ]],
 
         ['Cross-border transfer review',
          'Review transfer of payroll data to the regional HR platform',
-         'Payroll for the Nairobi and Lagos branches is being moved to a platform hosted in the EU. Need a transfer assessment before the migration date.', 3, true],
+         'Payroll for the Nairobi and Lagos branches is being moved to a platform hosted in the EU. Need a transfer assessment before the migration date.', 3, true,
+         'Data Protection Office', [
+            ['t', 'Assessment started. Need the processor agreement and the hosting location in writing from the vendor before this can be signed off.'],
+            ['u', 'Vendor has sent the agreement and confirmed the data stays in their Frankfurt region. HR want to go ahead on the 14th.'],
+            ['k', 'Transfer assessment completed against the Kenyan and Nigerian requirements and the contractual safeguards reviewed.', 180],
+            ['i?', 'The agreement is sound on security but silent on sub-processor notice, which is the clause that matters when they change hosting provider. Raised with Legal rather than blocking the migration over it.'],
+            ['j', 'Information Security', 'Information Security asked to confirm the encryption and access controls claimed in the vendor response rather than taking them on the vendor word.'],
+            ['s', 'Transfer approved subject to the signed agreement and a sub-processor notice clause added at renewal. Assessment filed and the processing register updated with the new recipient and location.'],
+         ]],
 
         ['Records of processing update',
          'Processing register out of date after the new claims portal',
-         'The claims portal went live last month and is not in the processing register. Needs a record created and a lawful basis recorded.', 2, true],
+         'The claims portal went live last month and is not in the processing register. Needs a record created and a lawful basis recorded.', 2, true,
+         'Data Protection Office', [
+            ['t', 'Need the data categories the portal collects and the retention period the business intends, which the project did not document at go live.'],
+            ['u', 'Collects name, contact details, policy number, claim detail and any supporting documents uploaded. Retention should follow the existing claims retention of seven years.'],
+            ['k', 'Register entry created with categories, lawful basis, retention and the recipients list.', 45],
+            ['s', 'Processing register updated with the claims portal, lawful basis recorded as contract performance, retention aligned to the existing claims schedule. Project checklist amended so a register entry is required before go live rather than after.'],
+         ]],
 
         ['Data protection impact assessment',
          'DPIA for the proposed customer analytics project',
-         'Marketing want to profile customer behaviour across products. This is likely to need an impact assessment before any processing starts.', 3, true],
+         'Marketing want to profile customer behaviour across products. This is likely to need an impact assessment before any processing starts.', 3, true,
+         'Data Protection Office', [
+            ['t', 'Screening confirms an assessment is required: profiling, large scale, and a product set that includes credit. Nothing should start until it is complete.'],
+            ['u', 'Marketing are asking whether they can begin with anonymised data while the assessment runs.'],
+            ['i', 'Worth being precise rather than obstructive. Genuinely anonymised data is outside scope, but what they have described is pseudonymised, which is not the same thing and is still personal data.'],
+            ['t', 'They can start on aggregate figures that cannot be traced to an individual. The dataset as described is pseudonymised rather than anonymised, so it stays in scope until the assessment is signed.'],
+            ['k', 'Assessment drafted with the risks, the mitigations and the residual risk position.', 240],
+            ['o?', 'Head of Marketing added as an observer so the sign-off conditions are not relayed second hand.'],
+            ['s', 'Assessment completed and approved with conditions: no credit product data in the first phase, a documented opt-out, and a review after six months. Conditions recorded against the project.'],
+         ]],
 
         ['Suspected phishing',
          'Payment instruction email appears to impersonate the CFO',
-         'Treasury received an urgent payment instruction appearing to come from the CFO. Display name matches, sending domain does not. Payment held. Need headers analysed and the sender blocked group-wide.', 5, false],
+         'Treasury received an urgent payment instruction appearing to come from the CFO. Display name matches, sending domain does not. Payment held. Need headers analysed and the sender blocked group-wide.', 5, false,
+         'Information Security', [
+            ['t', 'Payment held is the right call. Send the message as an attachment rather than a forward so the original headers survive.'],
+            ['u', 'Attached. There were two others in the team who received the same thing this morning.'],
+            ['k', 'Headers analysed. Sender domain registered four days ago, display name spoofed, reply-to pointing at a free mail address.', 40],
+            ['i', 'Four days old is the detail that matters. This is targeted at us rather than bulk, which means a second attempt from a different domain is likely within the week.'],
+            ['t', 'Sender domain and the reply-to address blocked at the gateway group-wide. A search across all mailboxes found seven further copies, all quarantined.'],
+            ['j?', 'Service Desk', 'Service Desk asked to confirm with each of the seven recipients that nobody replied or opened the attachment, which the gateway cannot tell us.'],
+            ['s', 'Sender blocked, copies quarantined, no recipient interacted with the message. Treasury payment verification procedure reconfirmed with the team: no payment instruction is actioned on email alone regardless of who appears to have sent it. Indicators shared with the sector group.'],
+         ]],
 
         ['Lost or stolen device',
          'Laptop stolen from a vehicle in Johannesburg',
-         'Underwriting laptop taken overnight. Device was encrypted. Need remote wipe confirmed and an assessment of whether any personal data was accessible.', 5, false],
+         'Underwriting laptop taken overnight. Device was encrypted. Need remote wipe confirmed and an assessment of whether any personal data was accessible.', 5, false,
+         'Service Desk', [
+            ['t', 'Device located in the asset register and a remote wipe issued. Account password reset and sessions revoked while we wait for the device to check in.'],
+            ['x', 'Information Security', 'Passing to Information Security. The wipe is issued but whether data was reachable is their assessment, and this needs a view on the encryption state at the time it was taken rather than what the build should have had.'],
+            ['k', 'Encryption state confirmed from the management console: full disk encryption active and compliant at the last check-in, which was the evening before the theft.', 50],
+            ['j', 'Data Protection Office', 'Data Protection Office added. An encrypted device is very likely not a notifiable breach, but that is their determination to record rather than ours to assume.'],
+            ['u?', 'Case number from the South African Police Service is attached for the insurance claim.'],
+            ['i?', 'Wipe has not yet executed because the device has not come online. Worth stating plainly in the record: the wipe is pending rather than confirmed, and encryption is what is actually protecting the data.'],
+            ['s', 'Device encrypted and compliant at the time of theft, account access revoked, remote wipe queued and confirmed when the device next checked in. Assessed as not notifiable on the basis of effective encryption, recorded with the evidence. Asset register updated and the insurance claim raised.'],
+         ]],
 
         ['Privileged access review',
          'Quarterly privileged access review overdue',
-         'The review of administrator accounts on the core banking platform is past due. Two accounts belong to staff who have since changed role.', 3, true],
+         'The review of administrator accounts on the core banking platform is past due. Two accounts belong to staff who have since changed role.', 3, true,
+         'Information Security', [
+            ['t', 'Account list extracted and sent to the platform owner for attestation. The two flagged accounts are suspended pending their response rather than left active while we wait.'],
+            ['u', 'Confirmed both have moved out of the team. Neither needs administrator access in their new roles.'],
+            ['k', 'Both accounts removed from the administrator group and the change evidenced for audit.', 35],
+            ['i?', 'The review was late because it depends on somebody remembering. Raising a change to put it on a schedule, since an access review that relies on memory will be late again next quarter.'],
+            ['s', 'Review completed, two accounts removed, remaining accounts attested by the platform owner. Evidence filed for audit and a recurring task raised so the next review is scheduled rather than remembered.'],
+         ]],
 
         ['Vulnerability remediation',
          'Critical patch outstanding on the database replica',
-         'Scanner has flagged a critical vulnerability on NAPHTALI. Needs a patch window agreed with Operations.', 4, false],
+         'Scanner has flagged a critical vulnerability on NAPHTALI. Needs a patch window agreed with Operations.', 4, false,
+         'Infrastructure Team', [
+            ['t', 'Confirmed the finding is genuine rather than a scanner artefact. This is the replica, not the primary, so it can be patched without a service outage if we take it out of the read pool first.'],
+            ['u?', 'Operations can give a window on Thursday evening after the batch run completes, usually by 21:00.'],
+            ['k', 'Replica removed from the read pool, patched, rebooted and verified against the primary before being returned to service.', 95],
+            ['i?', 'Replication lag was 40 minutes on return, cleared within the hour. Expected after a reboot but worth noting so the next person does not treat it as a fault.'],
+            ['s', 'Patch applied in the agreed window with no service impact. Rescan confirms the finding cleared. The primary is scheduled for the same patch in the next change window.'],
+         ]],
 
         ['Malware detection',
          'Endpoint protection quarantined a file on a branch workstation',
-         'Detection on a Lusaka workstation. Machine isolated pending review. Need confirmation nothing moved laterally.', 4, false],
+         'Detection on a Lusaka workstation. Machine isolated pending review. Need confirmation nothing moved laterally.', 4, false,
+         'Information Security', [
+            ['t', 'Machine is isolated. Reviewing the detection and the file origin before we decide whether this is a rebuild or a release.'],
+            ['k', 'File traced to a document downloaded from a webmail session. Quarantined before execution. No child processes and no outbound connections from the host in the surrounding period.', 65],
+            ['i', 'Caught before execution, so this is a detection working rather than an incident. The lateral movement question answers itself, but it still gets checked and written down rather than assumed.'],
+            ['u?', 'The member of staff says they were expecting an invoice from a supplier and opened it without thinking.'],
+            ['t', 'Nothing executed and nothing moved. Releasing the machine from isolation.'],
+            ['s', 'Detection confirmed as pre-execution quarantine. No lateral movement, no persistence, no credential exposure. Workstation released. The branch is scheduled for a short refresher on attachments, which is the control that actually failed here.'],
+         ]],
 
         ['Card data environment change',
          'Firewall rule change affecting the card environment',
-         'Requested rule change touches the segment holding card data. Needs review and sign-off before the change window.', 3, true],
+         'Requested rule change touches the segment holding card data. Needs review and sign-off before the change window.', 3, true,
+         'Network Team', [
+            ['t', 'Rule reviewed. As written it opens a wider source range than the application needs, which would not survive the next assessment.'],
+            ['x', 'Information Security', 'Anything touching the card segment needs Information Security sign-off before it goes in the change. Handing over with the narrowed rule proposed rather than the one requested.'],
+            ['i?', 'The original request was almost certainly copied from an older rule. Worth saying so to the requester, because the same text will come back next quarter otherwise.'],
+            ['u', 'The narrowed range works. We only need the two application hosts, not the whole subnet.'],
+            ['k', 'Rule narrowed to the two hosts, reviewed against the segmentation requirements and documented with a business justification and a review date.', 55],
+            ['s', 'Change approved as narrowed to two source hosts on a single port, with a documented justification and a twelve month review date. Implemented in the change window and segmentation testing confirmed unaffected.'],
+         ]],
 
         ['Core banking application',
          'Core banking slow for the whole Harare branch',
-         'Staff report transactions taking over a minute to post since this morning. Affecting the counter and the back office.', 4, false],
+         'Staff report transactions taking over a minute to post since this morning. Affecting the counter and the back office.', 4, false,
+         'Service Desk', [
+            ['t', 'Confirmed this is the branch rather than one workstation. Checking whether other branches are affected before this goes anywhere.'],
+            ['i', 'Nairobi and Gaborone are posting normally, so this is Harare or the path to it rather than the platform.'],
+            ['x', 'Applications Team', 'Handing to Applications. Branch-wide, single site, started this morning with no change to the workstations, so it is the application tier or the link rather than the desktop estate.'],
+            ['j', 'Infrastructure Team', 'Infrastructure joining to look at the database side while Applications work the application tier. Two teams on it because the symptom does not yet say which layer it is.'],
+            ['k', 'Traced to a long-running query holding locks on the posting table after an overnight job failed to complete and was not retried.', 110],
+            ['o?', 'Branch Manager added as an observer so the counter has a status without having to ring the desk for it.'],
+            ['u?', 'Posting times are back to normal at the counter as of about twenty minutes ago.'],
+            ['s', 'Stalled overnight job identified as the cause, cleared, and posting times returned to normal. Monitoring added so the job failing to complete raises an alert rather than being noticed at the counter the following morning. Raised as a problem record to fix the retry behaviour.'],
+         ]],
 
         ['Core banking application',
          'Policy document fails to generate for a specific product',
-         'Generating documents for the commercial motor product returns an error. Other products are fine.', 3, false],
+         'Schedules generate for every product except the group life cover. Error on screen and nothing in the output folder.', 3, false,
+         'Applications Team', [
+            ['t', 'Reproduced on a test policy, so this is the product configuration rather than anything the user did. Need the exact error text from the screen.'],
+            ['u', 'Screenshot attached. It mentions a missing template reference.'],
+            ['k', 'Template mapping for the group life product checked against the others. The mapping points at a template that was renamed during the last release and never repointed.', 70],
+            ['i?', 'This was shipped broken and nobody noticed because group life is low volume. Worth a release checklist item rather than only a fix.'],
+            ['t', 'Mapping corrected and a schedule generated successfully on test. Please try the live policy that failed and confirm.'],
+            ['u?', 'Generated first time. Document looks correct.'],
+            ['s', 'Template mapping corrected after a rename in the previous release left the group life product pointing at a template that no longer existed. Verified on the original policy. Release checklist updated to catch renamed templates.'],
+         ]],
 
         ['Email and collaboration',
          'Mailbox full, cannot send',
-         'Mailbox at quota and outbound mail is failing. Needs an increase or an archive policy applied.', 2, false],
+         'Cannot send or receive. Message says the mailbox has reached its limit.', 2, false,
+         'Service Desk', [
+            ['t', 'Mailbox is at quota. A temporary increase is applied so sending works again while the mailbox is tidied rather than leaving you stuck.'],
+            ['k', 'Temporary quota increase applied and archive policy checked against the retention schedule.', 20],
+            ['u?', 'Sending works again. I have moved the old attachments into the archive.'],
+            ['s', 'Quota restored and archiving explained. Mailbox is back under the standard limit with the temporary increase removed.'],
+         ]],
 
         ['Email and collaboration',
          'Shared claims mailbox not receiving external mail',
-         'Internal mail arrives, external does not. Brokers are phoning instead.', 4, false],
+         'Internal mail arrives in the shared claims mailbox but nothing from outside. Brokers say their messages are not bouncing.', 4, false,
+         'Service Desk', [
+            ['t', 'Internal working and external silently not arriving points at routing or filtering rather than permissions. Checking the gateway before the mailbox itself.'],
+            ['x', 'Infrastructure Team', 'Handing to Infrastructure. The messages are reaching the gateway and being dropped there, which is outside what the desk can see or change.'],
+            ['k', 'Transport rule found quarantining external mail to the shared address after a change to the anti-spoofing policy last week.', 60],
+            ['i', 'The policy change was correct; the shared mailbox was simply not in the exception list. Nineteen messages are sitting in quarantine and need releasing rather than only fixing the rule going forward.'],
+            ['t', 'Rule corrected and the nineteen held messages released to the mailbox. Brokers do not need to resend.'],
+            ['s', 'Anti-spoofing policy exception added for the shared claims mailbox and the quarantined messages released. The other shared mailboxes were checked for the same gap and two more were corrected before anyone reported them.'],
+         ]],
 
-        ['Network and connectivity',
+        ['Network connectivity',
          'Branch link down in Bulawayo',
-         'Whole branch offline. Failover to the backup link did not happen automatically.', 5, false],
+         'Entire branch offline. No access to core banking or email. Staff are recording transactions on paper.', 5, false,
+         'Network Team', [
+            ['t', 'Link is down rather than degraded. Failover to the backup circuit initiated while the primary is investigated with the carrier.'],
+            ['k', 'Backup circuit brought up and branch confirmed back on core banking. Carrier ticket raised against the primary.', 45],
+            ['u', 'Counter is back online. Paper transactions from the last hour still need to be keyed in.'],
+            ['o?', 'Branch Manager and Head of Operations added as observers. A branch recording transactions on paper is a business event rather than only a network one.'],
+            ['i?', 'Carrier is reporting a fibre break on the route, so the primary will be hours rather than minutes. The branch is working on the backup, so this is no longer urgent even though it is not yet fixed.'],
+            ['s', 'Branch restored on the backup circuit within the hour. Carrier confirmed a fibre break on the primary route and restored it the following day. Failover worked as designed, which is the point of paying for it. Manual transactions reconciled with Operations.'],
+         ]],
 
-        ['Network and connectivity',
+        ['Network connectivity',
          'Intermittent wireless drops on the second floor',
-         'Users dropping off wireless several times an hour. Wired connections unaffected.', 2, false],
+         'Staff on the second floor lose wireless for short periods through the day. Wired connections are unaffected.', 2, false,
+         'Network Team', [
+            ['t', 'Wired unaffected narrows this to the wireless side. Pulling the controller logs for that floor across the last week before anyone moves hardware.'],
+            ['k', 'Controller logs show repeated client disconnections on two access points, both on the same channel as a neighbouring tenant.', 50],
+            ['i?', 'Interference rather than a fault, which is why swapping the access point would have changed nothing and cost a morning.'],
+            ['t', 'Channel plan adjusted for the floor and transmit power reduced on the two access points to stop them overlapping.'],
+            ['u?', 'Much better today. No drops reported since yesterday afternoon.'],
+            ['s', 'Interference from a neighbouring tenant on an overlapping channel. Channel plan and power adjusted, drops stopped. A site survey is scheduled for the floor since the building has filled up since the wireless was designed.'],
+         ]],
 
         ['Account and access',
          'Account locked after password change',
-         'User cannot sign in after yesterday\'s password change. Locked out on both the laptop and the portal.', 3, false],
+         'Changed my password this morning and now the account is locked. Cannot get into email or the banking platform.', 3, false,
+         'Service Desk', [
+            ['t', 'Account unlocked. The lockout came from a device still presenting the old password rather than from anything you typed at the desk.'],
+            ['u', 'The phone was still signed in to mail. I have signed out and back in.'],
+            ['k', 'Account unlocked and the lockout source confirmed from the authentication logs as the mobile device.', 15],
+            ['s', 'Account unlocked and the stale session on the mobile device cleared. The pattern is common enough after a password change that it is now a step in the password change article rather than a ticket each time.'],
+         ]],
 
         ['Account and access',
          'Access needed to the underwriting reports folder',
-         'New role requires access to the shared underwriting reports. Line manager has approved.', 2, true],
+         'Moved into the underwriting team this month and cannot open the reports folder. Line manager has approved by email.', 2, true,
+         'Service Desk', [
+            ['t', 'Approval is on the ticket. Access is granted through the underwriting group rather than directly on the folder, so the permission comes away cleanly if the role changes again.'],
+            ['k', 'Added to the underwriting reports group and the change recorded against the access register.', 20],
+            ['i?', 'Direct folder permissions are how an estate ends up impossible to review. Group membership is marginally more work now and the difference between a two hour access review and a two day one later.'],
+            ['u?', 'Folder opens now, thank you.'],
+            ['s', 'Access granted through group membership with the manager approval attached to the record. Review date set to match the quarterly access review.'],
+         ]],
 
-        ['New starter provisioning',
+        ['Onboarding',
          'New starter in Claims, starts Monday',
-         'Needs an account, laptop, mailbox, core banking access at claims handler level and a desk phone.', 3, true],
+         'New claims assessor joins on Monday. Needs an account, a laptop, access to the claims system and a desk phone.', 2, true,
+         'Service Desk', [
+            ['t', 'Account created and the laptop is being built from the standard claims image. Need the line manager to confirm which claims role so the permissions match the job rather than copying another person.'],
+            ['u', 'Claims assessor, same as the rest of the team. Reporting to the Claims Manager.'],
+            ['k', 'Laptop built, encrypted, enrolled in management and tested. Account, mailbox, claims system access and desk extension configured.', 150],
+            ['i?', 'Copying another person account is how access spreads. The role is now mapped to a group, so the next claims assessor is a membership rather than another guess.'],
+            ['o?', 'Claims Manager added as an observer so they can see the build is ready before Monday rather than asking on the day.'],
+            ['s', 'Account, laptop, claims access and desk phone ready and tested before the start date. Equipment signed for and recorded against the asset register with the owner set. Role mapped to a group so the next starter in the same role is a single step.'],
+         ]],
 
-        ['Leaver offboarding',
+        ['Offboarding',
          'Leaver in Treasury, last day Friday',
-         'Needs all access revoked on the last day, mailbox delegated to the line manager and the laptop returned and wiped.', 4, true],
+         'Treasury analyst leaving on Friday. Needs accounts disabled, laptop and token returned, and mailbox access handed to the manager.', 3, true,
+         'Service Desk', [
+            ['t', 'Scheduled for close of business Friday rather than done now, so nothing stops working mid-handover. Equipment return is the part that usually slips, so it is tracked on this ticket.'],
+            ['j', 'Information Security', 'Information Security joining to revoke the privileged access and the payment platform token, which sit outside the standard leaver steps and are the ones that matter.'],
+            ['k', 'Accounts disabled at close of business, sessions revoked, mailbox converted to shared and delegated to the manager for the retention period.', 60],
+            ['u?', 'Laptop and token handed back to the branch on Friday afternoon.'],
+            ['i?', 'Payment platform token confirmed revoked separately from the directory account. A disabled account with a live payment token is the gap nobody sees until an audit finds it.'],
+            ['s', 'Accounts disabled on the last working day, privileged access and payment token revoked and confirmed separately, equipment returned and recorded, mailbox delegated to the manager with a retention end date set. Checklist evidence filed for audit.'],
+         ]],
 
         ['Hardware fault',
          'Laptop will not charge',
-         'Battery not charging and the machine only runs on mains. Replacement charger already tried.', 2, false],
+         'Laptop stopped charging. Battery drains and the charging light does not come on. Working on a borrowed machine.', 2, false,
+         'Service Desk', [
+            ['t', 'Try the spare charger at the branch before we book a repair. A failed charger and a failed port look identical from the desk and one of them is a five minute fix.'],
+            ['u', 'Spare charger does the same thing, so it is the laptop rather than the charger.'],
+            ['k', 'Device checked, charging port confirmed faulty. Warranty status verified from the asset register and a repair raised with the supplier.', 30],
+            ['i?', 'In warranty until next March, so this is a supplier repair rather than a replacement. The asset register having the purchase date is what made that a thirty second answer.'],
+            ['s', 'Charging port repaired under warranty. Loan machine issued while the repair ran and returned on collection. Asset record updated with the repair.'],
+         ]],
 
         ['Hardware fault',
          'Branch server making an audible alarm',
-         'Continuous alarm from the rack in Gaborone. Suspect a failed disk in the array.', 4, false],
+         'Continuous alarm from the rack in Gaborone. Suspect a failed disk in the array.', 4, false,
+         'Infrastructure Team', [
+            ['t', 'Management console confirms a single failed disk. The array is degraded rather than down, so the branch keeps working while this is replaced.'],
+            ['i', 'Degraded is the important word for whoever reads this next. One more failure in the same array before the rebuild finishes is data loss, so the replacement is today rather than this week.'],
+            ['k', 'Replacement disk dispatched to the branch and the failed disk identified by slot so the right one is pulled.', 25],
+            ['u?', 'Disk swapped this morning. The alarm has stopped.'],
+            ['k?', 'Array rebuild monitored to completion and the array confirmed healthy.', 40],
+            ['s', 'Failed disk replaced and the array rebuilt to a healthy state. The remaining disks are the same age and batch, so a staged replacement is raised as a change rather than waiting for the next one to fail.'],
+         ]],
 
         ['Printing',
          'Cannot print policy schedules at the counter',
-         'Counter printer not responding. Customers are waiting while documents are emailed instead.', 3, false],
+         'Counter printer not responding. Customers are waiting while documents are emailed instead.', 3, false,
+         'Service Desk', [
+            ['t', 'Queue is stuck rather than the printer being offline. Clearing it now, and the counter should be printing within a few minutes.'],
+            ['k', 'Print queue cleared and a test page confirmed from the counter workstation.', 15],
+            ['u?', 'Printing again. Thank you for the quick turnaround.'],
+            ['s', 'Stuck queue cleared and printing confirmed from the counter. A large document submitted twice was holding the queue; the driver has been updated to the version that handles the resubmission.'],
+         ]],
 
         ['Change request',
          'Add a disaster recovery test window for the core platform',
-         'Internal Audit have asked for evidence of a recovery test. Need a window agreed and the test documented.', 3, true],
+         'Internal Audit have asked for evidence of a recovery test. Need a window agreed and the test documented.', 3, true,
+         'Infrastructure Team', [
+            ['t', 'A test that proves something has to be a restore into an isolated environment rather than a confirmation that backups ran. Proposing the second Saturday, which avoids both the month end and the batch run.'],
+            ['u', 'Second Saturday works for Audit. They want to observe rather than only receive the report.'],
+            ['o', 'Internal Audit added as observers, which is simpler than writing them a separate report and more convincing than one.'],
+            ['k', 'Recovery test executed into an isolated environment. Restore completed and the recovery time measured against the stated objective.', 300],
+            ['i?', 'Recovery came in at four hours ten against a four hour objective. Reporting the real figure rather than rounding it, since a test that always passes is not a test.'],
+            ['s', 'Recovery test completed and documented with the measured recovery time, the one objective missed by ten minutes, and the two steps that caused it. Evidence provided to Internal Audit. The two steps are raised as their own changes rather than noted and forgotten.'],
+         ]],
 
         ['Change request',
          'Increase storage on the document management server',
-         'ZEBULUN is at 88 percent. Needs additional storage before the quarter end document load.', 2, true],
+         'ZEBULUN is at 88 percent. Needs additional storage before the quarter end document load.', 2, true,
+         'Infrastructure Team', [
+            ['t', 'Growth rate checked rather than only the current figure. At the current rate it reaches 95 percent before quarter end, so this is worth doing now rather than at the deadline.'],
+            ['k', 'Volume extended and the filesystem grown online with no outage.', 55],
+            ['i?', 'Alert threshold was set at 90 percent, which on this growth rate leaves about a fortnight. Lowering it to 80 so the next one arrives with time to plan rather than time to react.'],
+            ['s', 'Storage extended with no service interruption and the alert threshold lowered so the next increase is planned rather than urgent. Capacity now covers eighteen months at the current growth rate.'],
+         ]],
     ];
 
     /**

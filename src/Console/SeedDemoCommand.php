@@ -43,6 +43,18 @@ class SeedDemoCommand extends AbstractCommand
     private int $entity = 0;
     private array $made = [];
 
+    /** Group name to id, so a team can be named rather than guessed at. */
+    private array $groupIds = [];
+
+    /**
+     * Resolver team to the technicians actually in it, and who reports to
+     * whom. Both are built while people are created and read back when
+     * tickets are. Escalating to the Network Team and then naming somebody
+     * from Applications is exactly the inconsistency a prospect checks.
+     */
+    private array $teamAgents = [];
+    private array $supervisorOf = [];
+
     protected function configure(): void
     {
         parent::configure();
@@ -105,6 +117,7 @@ class SeedDemoCommand extends AbstractCommand
 
         $locations  = $this->seedLocations($output);
         $groups     = $this->seedGroups($output);
+        $this->groupIds = $groups;
         $users      = $this->seedUsers($output, $locations, $groups);
         $categories = $this->seedCategories($output);
 
@@ -434,6 +447,7 @@ class SeedDemoCommand extends AbstractCommand
                 $sup = $supervisors[$i % max(1, count($supervisors))] ?? null;
                 if ($sup && $sup['id'] !== $u['id']) {
                     (new \User())->update(['id' => $u['id'], 'users_id_supervisor' => $sup['id']]);
+                    $this->supervisorOf[$u['id']] = $sup['id'];
                 }
 
                 $pid = $isAgent ? $techProfile : $userProfile;
@@ -454,6 +468,7 @@ class SeedDemoCommand extends AbstractCommand
                 if ($isAgent) {
                     $teams = array_column(DemoData::TECH_GROUPS, 0);
                     $team  = $teams[$i % count($teams)];
+                    $this->teamAgents[$team][] = $u['id'];
                     if (($groups[$team] ?? 0) > 0 && !$this->db->request([
                         'FROM'  => 'glpi_groups_users',
                         'WHERE' => ['users_id' => $u['id'], 'groups_id' => $groups[$team]],
@@ -538,12 +553,139 @@ class SeedDemoCommand extends AbstractCommand
         $o->writeln('  tickets: twelve months of history, plus a live queue');
     }
 
+    /**
+     * Which beats this particular ticket plays.
+     *
+     * Templates repeat roughly fifteen times across a year of history, so a
+     * thread played identically every time would mean two tickets with the
+     * same subject reading word for word the same. Optional beats are kept
+     * or dropped on a function of the sequence number, which varies the
+     * thread without making it random: the same seed produces the same
+     * dataset, which matters when a demo is being rehearsed.
+     *
+     * Open tickets play only a prefix. A ticket raised this morning that
+     * already carries its full investigation and a handover is a tell, and
+     * a queue where every item is at the same stage is another.
+     */
+    private function chooseBeats(array $script, int $seq, bool $closed, int $daysAgo): array
+    {
+        $beats = [];
+        foreach ($script as $i => $beat) {
+            $kind = (string) $beat[0];
+            if (substr($kind, -1) === '?' && ((($seq * 7) + ($i * 13)) % 10) >= 5) {
+                continue;
+            }
+            $beat[0] = rtrim($kind, '?');
+            if ($beat[0] === 's') {
+                continue;   // the resolution is applied at close, not inline
+            }
+            $beats[] = $beat;
+        }
+
+        if ($closed || $beats === []) {
+            return $beats;
+        }
+
+        // Somebody has to be first in the queue each morning. A proportion of
+        // the live queue has had no response yet, which is also what makes the
+        // response-time figures on the dashboard mean anything.
+        if ($daysAgo === 0 && ($seq % 4) === 0) {
+            return [];
+        }
+
+        $progress = min(1.0, (($daysAgo * 86400) + 7200) / (3.5 * 86400));
+        $take     = max(1, (int) round($progress * count($beats)));
+
+        return array_slice($beats, 0, min($take, count($beats)));
+    }
+
+    /**
+     * Ascending timestamps for a thread, inside the window the ticket was
+     * actually live. A followup stamped before its ticket was raised, or
+     * after it closed, is the kind of thing a prospect notices on the one
+     * record they open properly.
+     */
+    private function beatTimes(int $from, int $to, int $count): array
+    {
+        $times = [];
+        if ($count < 1) {
+            return $times;
+        }
+        $span = max(600, $to - $from);
+        $step = $span / ($count + 1);
+        for ($i = 1; $i <= $count; $i++) {
+            $jitter  = (int) round($step * 0.3);
+            $at      = $from + (int) round($step * $i) + random_int(-$jitter, $jitter);
+            $times[] = max($from + 60, min($to, $at));
+        }
+        sort($times);
+        return $times;
+    }
+
+    /** Run a write with the application clock moved to a point in the past. */
+    private function atTime(int $ts, callable $fn): void
+    {
+        $was = $_SESSION['glpi_currenttime'] ?? null;
+        $_SESSION['glpi_currenttime'] = date('Y-m-d H:i:s', $ts);
+        try {
+            $fn();
+        } finally {
+            if ($was === null) {
+                unset($_SESSION['glpi_currenttime']);
+            } else {
+                $_SESSION['glpi_currenttime'] = $was;
+            }
+        }
+    }
+
+    /** A technician who is actually in the named team, or any agent. */
+    private function agentFor(string $team, int $seq, array $agents): int
+    {
+        $pool = $this->teamAgents[$team] ?? [];
+        if ($pool !== []) {
+            return (int) $pool[$seq % count($pool)];
+        }
+        if ($agents !== []) {
+            return (int) $agents[$seq % count($agents)]['id'];
+        }
+        return 0;
+    }
+
+    /**
+     * Record a handover on the ticket history.
+     *
+     * Written as a simple message rather than as a field change, because the
+     * field-change form needs a search option id and those move between
+     * releases. A line of text in the history survives an upgrade; a wrong
+     * id renders as a blank row nobody can explain.
+     */
+    private function logHistory(int $ticket, int $ts, string $message): void
+    {
+        try {
+            $this->db->insert('glpi_logs', [
+                'itemtype'         => 'Ticket',
+                'items_id'         => $ticket,
+                'itemtype_link'    => 'Group',
+                'linked_action'    => \Log::HISTORY_LOG_SIMPLE_MESSAGE,
+                'user_name'        => 'FrexCore',
+                'date_mod'         => date('Y-m-d H:i:s', $ts),
+                'id_search_option' => 0,
+                'old_value'        => '',
+                'new_value'        => $message,
+            ]);
+        } catch (\Throwable $e) {
+            // History is narration. Losing a line of it is not worth failing
+            // the ticket that the line describes.
+        }
+    }
+
     /** Returns 1 if a ticket was created, 0 otherwise. */
     private function makeTicket(int $seq, int $daysAgo, bool $closed, array $staff,
                                 array $agents, array $categories): int
     {
         $templates = DemoData::TICKETS;
-        [$cat, $title, $body, $urgency, $isRequest] = $templates[$seq % count($templates)];
+        $row       = $templates[$seq % count($templates)];
+        [$cat, $title, $body, $urgency, $isRequest, $homeTeam, $script] = $row;
 
         if ($this->dry) {
             return 1;
@@ -552,38 +694,56 @@ class SeedDemoCommand extends AbstractCommand
         $now    = time();
         $opened = $now - ($daysAgo * 86400) - random_int(3600, 43200);
 
-        if ($closed) {
-            $status = \CommonITILObject::CLOSED;
-        } elseif ($daysAgo >= 4) {
-            // Work open several days is waiting on somebody. Saying so is the
-            // difference between a queue that reads as managed and one that
-            // reads as ignored.
-            $status = \CommonITILObject::WAITING;
-        } else {
-            $status = [\CommonITILObject::INCOMING, \CommonITILObject::ASSIGNED,
-                       \CommonITILObject::PLANNED][random_int(0, 2)];
-        }
+        $beats = $this->chooseBeats($script, $seq, $closed, $daysAgo);
 
+        // The thread has to fit inside the life of the ticket, so the close
+        // time is decided before anything is written rather than after.
+        $solveIn   = random_int(1800, 3 * 86400);
+        $solvedAt  = $opened + $solveIn;
+        $threadEnd = $closed ? $solvedAt - 600 : $now - 600;
+        $times     = $this->beatTimes($opened + 300, max($opened + 900, $threadEnd), count($beats));
+
+        $requester = $staff[random_int(0, count($staff) - 1)]['id'];
+        $assignee  = $this->agentFor($homeTeam, $seq, $agents);
+        $groupId   = (int) ($this->groupIds[$homeTeam] ?? 0);
+
+        // Nobody has picked this one up yet. It sits with the team rather
+        // than with a person, which is what an unworked queue actually looks
+        // like: a ticket showing a named owner and no activity reads as
+        // somebody ignoring it rather than as somebody not having got to it.
+        $untouched = !$closed && $beats === [];
+
+        // Created in a working state whatever it ends up as. A closed ticket
+        // that acquires its conversation afterwards is a record built in the
+        // wrong order, and the object layer is entitled to refuse the writes.
         $ticket = new \Ticket();
-        $id = $ticket->add([
-            'name'                => $title,
-            'content'             => $body,
-            'entities_id'         => $this->entity,
-            'type'                => $isRequest ? \Ticket::DEMAND_TYPE : \Ticket::INCIDENT_TYPE,
-            'itilcategories_id'   => max(0, $categories[$cat] ?? 0),
-            'status'              => $status,
-            'urgency'             => $urgency,
-            'impact'              => max(1, min(5, $urgency - random_int(0, 1))),
-            'priority'            => $urgency,
-            '_users_id_requester' => $staff[random_int(0, count($staff) - 1)]['id'],
-            '_users_id_assign'    => $agents[random_int(0, count($agents) - 1)]['id'],
-            '_groups_id_assign'   => $this->resolverGroups
-                                     ? $this->resolverGroups[$seq % count($this->resolverGroups)] : 0,
-            '_auto_import'        => true,
-        ]);
-        if ($id === false) {
+        $id     = null;
+        $this->atTime($opened, function () use (&$id, $ticket, $title, $body, $isRequest,
+                                                $categories, $cat, $urgency, $requester,
+                                                $assignee, $groupId, $untouched) {
+            $id = $ticket->add([
+                'name'                => $title,
+                'content'             => $body,
+                'entities_id'         => $this->entity,
+                'type'                => $isRequest ? \Ticket::DEMAND_TYPE : \Ticket::INCIDENT_TYPE,
+                'itilcategories_id'   => max(0, $categories[$cat] ?? 0),
+                'status'              => \CommonITILObject::ASSIGNED,
+                'urgency'             => $urgency,
+                'impact'              => max(1, min(5, $urgency - random_int(0, 1))),
+                'priority'            => $urgency,
+                '_users_id_requester' => $requester,
+                '_users_id_assign'    => $untouched ? 0 : $assignee,
+                '_groups_id_assign'   => $groupId,
+                '_auto_import'        => true,
+            ]);
+        });
+
+        if ($id === false || $id === null) {
             return 0;
         }
+        $id = (int) $id;
+
+        $this->playThread($id, $beats, $times, $requester, $assignee, $homeTeam, $groupId, $seq, $closed);
 
         // Dates are written after creation: the application stamps its own on
         // insert, so backdating has to be a second step. These are plain
@@ -592,15 +752,28 @@ class SeedDemoCommand extends AbstractCommand
         $upd  = ['date' => $open, 'date_creation' => $open, 'date_mod' => $open];
 
         if ($closed) {
-            $solveIn = random_int(1800, 3 * 86400);
-            $upd['solvedate'] = date('Y-m-d H:i:s', $opened + $solveIn);
-            $upd['closedate'] = date('Y-m-d H:i:s', $opened + $solveIn + random_int(600, 86400));
-            $upd['date_mod']    = $upd['closedate'];
+            $upd['status']    = \CommonITILObject::CLOSED;
+            $upd['solvedate'] = date('Y-m-d H:i:s', $solvedAt);
+            $upd['closedate'] = date('Y-m-d H:i:s', $solvedAt + random_int(600, 86400));
+            $upd['date_mod']  = $upd['closedate'];
             $upd['slas_id_ttr'] = max(0, $this->slaByPriority[$urgency] ?? 0);
             // Resolved comfortably inside target, which is the point of
             // showing it: the record demonstrates the desk met its promise.
-            $upd['time_to_resolve'] = date('Y-m-d H:i:s', $opened + $solveIn + random_int(3600, 7200));
+            $upd['time_to_resolve'] = date('Y-m-d H:i:s', $solvedAt + random_int(3600, 7200));
         } else {
+            // Work that has been open for days is waiting on somebody, and a
+            // queue that says so reads as managed rather than ignored. A
+            // ticket nobody has touched yet stays in the state it arrived in.
+            if ($untouched) {
+                $upd['status'] = \CommonITILObject::INCOMING;
+            } elseif ($daysAgo >= 4) {
+                $upd['status'] = \CommonITILObject::WAITING;
+            } else {
+                $upd['status'] = [\CommonITILObject::ASSIGNED,
+                                  \CommonITILObject::PLANNED][random_int(0, 1)];
+            }
+            $upd['date_mod'] = date('Y-m-d H:i:s', $times ? end($times) : $opened);
+
             // A board showing no breaches fails to demonstrate the one thing a
             // service desk is bought to prevent; a board showing nothing but
             // breaches describes an organisation nobody wants to copy.
@@ -613,12 +786,24 @@ class SeedDemoCommand extends AbstractCommand
         $this->db->update('glpi_tickets', $upd, ['id' => $id]);
 
         if ($closed) {
+            $text = '';
+            foreach ($script as $beat) {
+                if (rtrim((string) $beat[0], '?') === 's') {
+                    $text = (string) $beat[1];
+                    break;
+                }
+            }
+            if ($text === '') {
+                $text = DemoData::RESOLUTIONS[$seq % count(DemoData::RESOLUTIONS)];
+            }
             try {
-                (new \ITILSolution())->add([
-                    'itemtype' => 'Ticket',
-                    'items_id' => $id,
-                    'content'  => DemoData::RESOLUTIONS[random_int(0, count(DemoData::RESOLUTIONS) - 1)],
-                ]);
+                $this->atTime($solvedAt, function () use ($id, $text) {
+                    (new \ITILSolution())->add([
+                        'itemtype' => 'Ticket',
+                        'items_id' => $id,
+                        'content'  => $text,
+                    ]);
+                });
             } catch (\Throwable $e) {
                 // Resolution text is presentation. Losing it is not worth
                 // failing an otherwise good seeding run.
@@ -626,6 +811,201 @@ class SeedDemoCommand extends AbstractCommand
         }
 
         return 1;
+    }
+
+    /**
+     * Write the conversation, the work and the handovers onto a ticket.
+     *
+     * Every entry goes in through the object layer at a moved clock rather
+     * than as a hand-written INSERT, so the application maintains its own
+     * counters and history alongside. The one thing done directly is removing
+     * an outgoing assignee, because deleting through the object layer fires
+     * notifications at people who were taken off a ticket a year ago.
+     */
+    private function playThread(int $id, array $beats, array $times, int $requester,
+                                int $assignee, string $team, int $groupId,
+                                int $seq, bool $closed): void
+    {
+        foreach ($beats as $n => $beat) {
+            $kind = (string) $beat[0];
+            $at   = $times[$n] ?? null;
+            if ($at === null) {
+                break;
+            }
+
+            try {
+                switch ($kind) {
+                    case 'u':
+                        $this->addFollowup($id, $at, $requester, (string) $beat[1], false,
+                                           \CommonITILObject::TIMELINE_LEFT);
+                        break;
+
+                    case 't':
+                        $this->addFollowup($id, $at, $assignee, (string) $beat[1], false,
+                                           \CommonITILObject::TIMELINE_RIGHT);
+                        break;
+
+                    case 'i':
+                        $this->addFollowup($id, $at, $assignee, (string) $beat[1], true,
+                                           \CommonITILObject::TIMELINE_RIGHT);
+                        break;
+
+                    case 'k':
+                        $this->addTask($id, $at, $assignee, $groupId, (string) $beat[1],
+                                       (int) ($beat[2] ?? 30), $closed || $n < count($beats) - 1);
+                        break;
+
+                    case 'x':
+                        $to      = (string) $beat[1];
+                        $toGroup = (int) ($this->groupIds[$to] ?? 0);
+                        $toAgent = $this->agentFor($to, $seq + 1, []);
+                        // The handover note is written by whoever is letting
+                        // go of it, so it is logged before the actors change.
+                        $this->addFollowup($id, $at, $assignee, (string) $beat[2], false,
+                                           \CommonITILObject::TIMELINE_RIGHT);
+                        if ($toGroup > 0 && $toAgent > 0) {
+                            $this->dropAssignee($id, $assignee, $groupId);
+                            $this->addActor($id, $at, $toAgent, $toGroup, \CommonITILActor::ASSIGN);
+                            $this->logHistory($id, $at, sprintf(
+                                'Reassigned from %s to %s', $team, $to
+                            ));
+                            $assignee = $toAgent;
+                            $groupId  = $toGroup;
+                            $team     = $to;
+                        }
+                        break;
+
+                    case 'j':
+                        $with      = (string) $beat[1];
+                        $withGroup = (int) ($this->groupIds[$with] ?? 0);
+                        $withAgent = $this->agentFor($with, $seq + 2, []);
+                        $this->addFollowup($id, $at, $assignee, (string) $beat[2], false,
+                                           \CommonITILObject::TIMELINE_RIGHT);
+                        if ($withGroup > 0 && $withAgent > 0 && $withAgent !== $assignee) {
+                            $this->addActor($id, $at, $withAgent, $withGroup, \CommonITILActor::ASSIGN);
+                            $this->logHistory($id, $at, sprintf(
+                                '%s added alongside %s', $with, $team
+                            ));
+                        }
+                        break;
+
+                    case 'o':
+                        $watcher = (int) ($this->supervisorOf[$requester] ?? 0);
+                        if ($watcher > 0 && $watcher !== $requester) {
+                            $this->addActor($id, $at, $watcher, 0, \CommonITILActor::OBSERVER);
+                            $this->logHistory($id, $at, 'Observer added');
+                        }
+                        $this->addFollowup($id, $at, $assignee, (string) $beat[1], true,
+                                           \CommonITILObject::TIMELINE_RIGHT);
+                        break;
+                }
+            } catch (\Throwable $e) {
+                // One beat failing costs a line of conversation. It must not
+                // cost the ticket, and it must not stop the run.
+            }
+        }
+    }
+
+    private function addFollowup(int $id, int $at, int $by, string $text,
+                                 bool $private, int $position): void
+    {
+        if ($by <= 0 || $text === '') {
+            return;
+        }
+        $this->atTime($at, function () use ($id, $at, $by, $text, $private, $position) {
+            $fup = new \ITILFollowup();
+            $new = $fup->add([
+                'itemtype'          => 'Ticket',
+                'items_id'          => $id,
+                'content'           => $text,
+                'users_id'          => $by,
+                'is_private'        => $private ? 1 : 0,
+                'timeline_position' => $position,
+                '_auto_import'      => true,
+            ]);
+            if ($new) {
+                $stamp = date('Y-m-d H:i:s', $at);
+                $this->db->update('glpi_itilfollowups', [
+                    'date' => $stamp, 'date_creation' => $stamp, 'date_mod' => $stamp,
+                ], ['id' => (int) $new]);
+            }
+        });
+        $this->tally('ticket updates');
+    }
+
+    private function addTask(int $id, int $at, int $by, int $group, string $text,
+                             int $minutes, bool $done): void
+    {
+        if ($by <= 0 || $text === '') {
+            return;
+        }
+        $this->atTime($at, function () use ($id, $at, $by, $group, $text, $minutes, $done) {
+            $task = new \TicketTask();
+            $new  = $task->add([
+                'tickets_id'        => $id,
+                'content'           => $text,
+                'users_id'          => $by,
+                'users_id_tech'     => $by,
+                'groups_id_tech'    => $group,
+                'actiontime'        => $minutes * 60,
+                'state'             => $done ? \Planning::DONE : \Planning::TODO,
+                'begin'             => date('Y-m-d H:i:s', $at),
+                'end'               => date('Y-m-d H:i:s', $at + ($minutes * 60)),
+                'is_private'        => 0,
+                'timeline_position' => \CommonITILObject::TIMELINE_RIGHT,
+                '_auto_import'      => true,
+            ]);
+            if ($new) {
+                $stamp = date('Y-m-d H:i:s', $at);
+                $this->db->update('glpi_tickettasks', [
+                    'date' => $stamp, 'date_creation' => $stamp, 'date_mod' => $stamp,
+                ], ['id' => (int) $new]);
+            }
+        });
+        $this->tally('work logged');
+    }
+
+    private function addActor(int $id, int $at, int $user, int $group, int $type): void
+    {
+        $this->atTime($at, function () use ($id, $user, $group, $type) {
+            if ($user > 0 && !$this->db->request([
+                'FROM'  => 'glpi_tickets_users',
+                'WHERE' => ['tickets_id' => $id, 'users_id' => $user, 'type' => $type],
+            ])->current()) {
+                (new \Ticket_User())->add([
+                    'tickets_id' => $id, 'users_id' => $user, 'type' => $type,
+                ]);
+            }
+            if ($group > 0 && !$this->db->request([
+                'FROM'  => 'glpi_groups_tickets',
+                'WHERE' => ['tickets_id' => $id, 'groups_id' => $group, 'type' => $type],
+            ])->current()) {
+                (new \Group_Ticket())->add([
+                    'tickets_id' => $id, 'groups_id' => $group, 'type' => $type,
+                ]);
+            }
+        });
+    }
+
+    /**
+     * Take the outgoing assignee off the record.
+     *
+     * A ticket that accumulates assignees without ever losing one shows six
+     * names against a single password reset, which is worse than showing no
+     * handover at all: it says the product cannot model one.
+     */
+    private function dropAssignee(int $id, int $user, int $group): void
+    {
+        if ($user > 0) {
+            $this->db->delete('glpi_tickets_users', [
+                'tickets_id' => $id, 'users_id' => $user, 'type' => \CommonITILActor::ASSIGN,
+            ]);
+        }
+        if ($group > 0) {
+            $this->db->delete('glpi_groups_tickets', [
+                'tickets_id' => $id, 'groups_id' => $group, 'type' => \CommonITILActor::ASSIGN,
+            ]);
+        }
     }
 
     /**
