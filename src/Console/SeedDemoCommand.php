@@ -264,118 +264,132 @@ class SeedDemoCommand extends AbstractCommand
         $o->writeln('  server estate');
     }
 
+    /**
+     * Tickets, in two deliberate phases.
+     *
+     * A single probabilistic loop cannot produce both a year of history and
+     * a credible queue as it stands today. Tuned to give realistic history
+     * it leaves almost nothing open; tuned to leave a working queue it
+     * scatters year-old open tickets through the record. Both were tried.
+     *
+     * So history and the live queue are generated separately, which is also
+     * how the real thing arrives: a closed record accumulated over months,
+     * and a handful of items currently in flight.
+     */
     private function seedTickets(OutputInterface $o, int $target, array $users, array $categories): void
     {
-        $templates = DemoData::TICKETS;
-        $agents    = array_values(array_filter($users, fn($u) => $u['agent'] && $u['id'] > 0));
-        $staff     = array_values(array_filter($users, fn($u) => $u['id'] > 0));
+        $agents = array_values(array_filter($users, fn($u) => $u['agent'] && $u['id'] > 0));
+        $staff  = array_values(array_filter($users, fn($u) => $u['id'] > 0));
 
         if (!$this->dry && (empty($agents) || empty($staff))) {
             $o->writeln('  <error>no usable people, skipping tickets</error>');
             return;
         }
 
-        $now = time();
+        // Enough open work to fill the queue card without looking swamped.
+        $openWanted = max(14, (int) round($target * 0.08));
+        $histWanted = max(1, $target - $openWanted);
         $made = 0;
 
-        for ($i = 0; $i < $target; $i++) {
-            [$cat, $title, $body, $urgency, $isRequest] = $templates[$i % count($templates)];
+        // Phase one: the closed record, weighted towards recent months so the
+        // trend rises. No real desk has ever had a flat year.
+        for ($i = 0; $i < $histWanted; $i++) {
+            $skew    = ($i / max(1, $histWanted)) ** 0.7;
+            $daysAgo = (int) round(350 * (1 - $skew)) + random_int(14, 21);
+            $made   += $this->makeTicket($i, $daysAgo, true, $staff, $agents, $categories);
+        }
 
-            // Spread over twelve months, weighted towards recent so the trend
-            // chart rises rather than sitting flat. A flat year of identical
-            // volume is the shape no real service desk has ever had.
-            $skew    = ($i / max(1, $target)) ** 0.7;
-            $daysAgo = (int) round(365 * (1 - $skew)) + random_int(0, 6);
-            $opened  = $now - ($daysAgo * 86400) - random_int(0, 43200);
-
-            // Nearly all older work is closed. Leaving a lot of it open would
-            // be the realistic-looking choice that is actually wrong: an old
-            // open ticket is a breached ticket, so a backlog of them makes the
-            // demo organisation look like it is failing rather than coping.
-            $closed = $daysAgo > 30 ? (random_int(1, 100) <= 99)
-                                    : (random_int(1, 100) <= 55);
-
-            $status = $closed
-                ? \CommonITILObject::CLOSED
-                : [\CommonITILObject::INCOMING, \CommonITILObject::ASSIGNED,
-                   \CommonITILObject::PLANNED, \CommonITILObject::WAITING][random_int(0, 3)];
-
-            $requester = $staff[random_int(0, count($staff) - 1)]['id'];
-            $assignee  = $agents[random_int(0, count($agents) - 1)]['id'];
-
-            if ($this->dry) { $made++; continue; }
-
-            $fields = [
-                'name'                => $title,
-                'content'             => $body,
-                'entities_id'         => $this->entity,
-                'type'                => $isRequest ? \Ticket::DEMAND_TYPE : \Ticket::INCIDENT_TYPE,
-                'itilcategories_id'   => max(0, $categories[$cat] ?? 0),
-                'status'              => $status,
-                'urgency'             => $urgency,
-                'impact'              => max(1, min(5, $urgency - random_int(0, 1))),
-                'priority'            => $urgency,
-                '_users_id_requester' => $requester,
-                '_users_id_assign'    => $assignee,
-                '_auto_import'        => true,
-            ];
-
-            $ticket = new \Ticket();
-            $id = $ticket->add($fields);
-            if ($id === false) {
-                continue;
-            }
-
-            // Dates are set after creation on purpose. The application stamps
-            // its own on insert, so backdating has to be a second step; these
-            // are plain columns, so writing them directly is safe.
-            $open = date('Y-m-d H:i:s', $opened);
-            $upd  = ['date' => $open, 'date_creation' => $open, 'date_mod' => $open];
-
-            if ($closed) {
-                $solveIn = random_int(1800, 4 * 86400);
-                $upd['solvedate'] = date('Y-m-d H:i:s', $opened + $solveIn);
-                $upd['closedate'] = date('Y-m-d H:i:s', $opened + $solveIn + random_int(600, 86400));
-                $upd['date_mod']  = $upd['closedate'];
-            } else {
-                // Resolution targets run from now, not from the open date.
-                // Deriving them from the open date made almost every open
-                // ticket breached the moment it aged, which reads as an
-                // organisation in collapse rather than one worth copying.
-                //
-                // A deliberate minority is genuinely late, because a board
-                // showing no breaches at all fails to demonstrate the single
-                // thing a service desk is bought to prevent.
-                if (random_int(1, 100) <= 12) {
-                    $due = $now - random_int(3600, 3 * 86400);
-                } else {
-                    $due = $now + (($urgency >= 4 ? random_int(1, 8) : random_int(8, 72)) * 3600);
-                }
-                $upd['time_to_resolve'] = date('Y-m-d H:i:s', $due);
-            }
-
-            $this->db->update('glpi_tickets', $upd, ['id' => $id]);
-
-            // A closed ticket with nothing in the resolution field is the
-            // first thing a prospect opens and the first thing that looks
-            // unfinished. Solutions are their own records, not a column.
-            if ($closed) {
-                try {
-                    (new \ITILSolution())->add([
-                        'itemtype' => 'Ticket',
-                        'items_id' => $id,
-                        'content'  => DemoData::RESOLUTIONS[random_int(0, count(DemoData::RESOLUTIONS) - 1)],
-                    ]);
-                } catch (\Throwable $e) {
-                    // Resolution text is presentation. Losing it is not worth
-                    // failing a seeding run that is otherwise fine.
-                }
-            }
-            $made++;
+        // Phase two: the queue as it stands this morning.
+        for ($i = 0; $i < $openWanted; $i++) {
+            $daysAgo = (int) floor(((1 - ($i / max(1, $openWanted))) ** 1.6) * 9);
+            $made   += $this->makeTicket($histWanted + $i, $daysAgo, false, $staff, $agents, $categories);
         }
 
         $this->tally('tickets', $made);
-        $o->writeln('  tickets with twelve months of history');
+        $o->writeln('  tickets: twelve months of history, plus a live queue');
+    }
+
+    /** Returns 1 if a ticket was created, 0 otherwise. */
+    private function makeTicket(int $seq, int $daysAgo, bool $closed, array $staff,
+                                array $agents, array $categories): int
+    {
+        $templates = DemoData::TICKETS;
+        [$cat, $title, $body, $urgency, $isRequest] = $templates[$seq % count($templates)];
+
+        if ($this->dry) {
+            return 1;
+        }
+
+        $now    = time();
+        $opened = $now - ($daysAgo * 86400) - random_int(3600, 43200);
+
+        if ($closed) {
+            $status = \CommonITILObject::CLOSED;
+        } elseif ($daysAgo >= 4) {
+            // Work open several days is waiting on somebody. Saying so is the
+            // difference between a queue that reads as managed and one that
+            // reads as ignored.
+            $status = \CommonITILObject::WAITING;
+        } else {
+            $status = [\CommonITILObject::INCOMING, \CommonITILObject::ASSIGNED,
+                       \CommonITILObject::PLANNED][random_int(0, 2)];
+        }
+
+        $ticket = new \Ticket();
+        $id = $ticket->add([
+            'name'                => $title,
+            'content'             => $body,
+            'entities_id'         => $this->entity,
+            'type'                => $isRequest ? \Ticket::DEMAND_TYPE : \Ticket::INCIDENT_TYPE,
+            'itilcategories_id'   => max(0, $categories[$cat] ?? 0),
+            'status'              => $status,
+            'urgency'             => $urgency,
+            'impact'              => max(1, min(5, $urgency - random_int(0, 1))),
+            'priority'            => $urgency,
+            '_users_id_requester' => $staff[random_int(0, count($staff) - 1)]['id'],
+            '_users_id_assign'    => $agents[random_int(0, count($agents) - 1)]['id'],
+            '_auto_import'        => true,
+        ]);
+        if ($id === false) {
+            return 0;
+        }
+
+        // Dates are written after creation: the application stamps its own on
+        // insert, so backdating has to be a second step. These are plain
+        // columns, so writing them directly is safe.
+        $open = date('Y-m-d H:i:s', $opened);
+        $upd  = ['date' => $open, 'date_creation' => $open, 'date_mod' => $open];
+
+        if ($closed) {
+            $solveIn = random_int(1800, 3 * 86400);
+            $upd['solvedate'] = date('Y-m-d H:i:s', $opened + $solveIn);
+            $upd['closedate'] = date('Y-m-d H:i:s', $opened + $solveIn + random_int(600, 86400));
+            $upd['date_mod']  = $upd['closedate'];
+        } else {
+            // A board showing no breaches fails to demonstrate the one thing a
+            // service desk is bought to prevent; a board showing nothing but
+            // breaches describes an organisation nobody wants to copy.
+            $upd['time_to_resolve'] = random_int(1, 100) <= 15
+                ? date('Y-m-d H:i:s', $now - random_int(3600, 2 * 86400))
+                : date('Y-m-d H:i:s', $now + (($urgency >= 4 ? random_int(2, 10) : random_int(12, 72)) * 3600));
+        }
+
+        $this->db->update('glpi_tickets', $upd, ['id' => $id]);
+
+        if ($closed) {
+            try {
+                (new \ITILSolution())->add([
+                    'itemtype' => 'Ticket',
+                    'items_id' => $id,
+                    'content'  => DemoData::RESOLUTIONS[random_int(0, count(DemoData::RESOLUTIONS) - 1)],
+                ]);
+            } catch (\Throwable $e) {
+                // Resolution text is presentation. Losing it is not worth
+                // failing an otherwise good seeding run.
+            }
+        }
+
+        return 1;
     }
 
     // ---------------------------------------------------------------- purge
