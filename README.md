@@ -78,3 +78,53 @@ Then Setup → Plugins → install, then activate.
 
 Oldest first is deliberate. Newest-first shows the work that has been waiting
 least, which is the opposite of useful on a morning when the desk is behind.
+
+## Demonstration data
+
+```bash
+# preview without writing anything
+sudo -u frex-demo php /srv/frexcore/tenants/demo/app/bin/console \
+    plugins:frexcore:seed-demo --dry-run
+
+# load it
+sudo -u frex-demo php /srv/frexcore/tenants/demo/app/bin/console \
+    plugins:frexcore:seed-demo --org="Shiloh Financial Group"
+
+# take it back out
+sudo -u frex-demo php /srv/frexcore/tenants/demo/app/bin/console \
+    plugins:frexcore:seed-demo --purge
+```
+
+Builds a believable organisation: branches across seven countries, twenty
+staff, a named server estate, categories carrying the regulation behind each
+one, and roughly a year of ticket history.
+
+**Why a console command and not a .sql file.** Tickets are not one table.
+Actors live in `glpi_tickets_users`, solutions are their own records, and the
+application maintains history alongside. Hand-written INSERTs that miss those
+produce a demo where every ticket has no requester, which gets noticed in the
+first thirty seconds of a presentation. Running inside the console means the
+application's own object layer does the work.
+
+**Safety.** This writes data. Against a live tenant it would put invented
+policyholders into a real client's system, so it refuses to run on any
+instance that already holds tickets unless forced, supports `--dry-run`, and
+tags everything it creates so `--purge` removes what it made.
+
+**The compliance framing is the point.** Categories name the obligation they
+answer to: GDPR Article 33 and its 72 hour clock, POPIA, the Zimbabwe Cyber
+and Data Protection Act, Kenya's Data Protection Act 2019, Nigeria's NDPA
+2023, Botswana's DPA 2018, the AU Malabo Convention, ISO 27001 Annex A and
+PCI DSS. An ITSM demo showing tickets is unremarkable. One showing a subject
+access request with a statutory clock against it speaks to whoever in the
+room owns compliance, which is usually whoever signs.
+
+**Shape over volume.** Ticket history rises across the year rather than
+sitting flat, because no real service desk has ever had a flat year. Roughly
+94 percent of work is closed and around 8 percent of what remains is
+breaching its target. An earlier version derived resolution targets from the
+open date, which made almost every open ticket breached and painted the demo
+organisation as collapsing rather than coping.
+
+The dataset lives in `src/Demo/DemoData.php`. A prospect-specific variant is
+a copy of that file, not a fork of the seeder.
