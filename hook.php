@@ -1,80 +1,37 @@
 <?php
 
 /**
- * -------------------------------------------------------------------------
- * UI Branding plugin for GLPI
- * -------------------------------------------------------------------------
+ * FrexCore plugin — install lifecycle.
  *
- * LICENSE
+ * Deliberately empty of work. The plugin creates no tables and writes no
+ * files into the application tree, so there is nothing to install, nothing
+ * to migrate, and nothing left behind on removal. Deactivating it returns
+ * the platform to upstream's own cards with no cleanup step — which is what
+ * makes it safe to disable during an incident.
  *
- * This file is part of UI Branding plugin for GLPI.
- *
- * "UI Branding plugin for GLPI" is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3 of the License, or
- * (at your option) any later version.
- *
- * "UI Branding plugin for GLPI" is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with "UI Branding plugin for GLPI". If not, see <http://www.gnu.org/licenses/>.
- * -------------------------------------------------------------------------
  * @copyright Copyright (C) 2026 by i-Vertix/PGUM.
+ * @copyright Copyright (C) 2026 FrexCore and contributors.
  * @license   GPLv3 https://www.gnu.org/licenses/gpl-3.0.html
- * @link      https://github.com/i-Vertix/glpi-modifications
- * -------------------------------------------------------------------------
- */
-
-use GlpiPlugin\Mod\BrandManager;
-
-/**
- * Plugin install process
  *
- * @return boolean
+ * Changed 2026-10-02 by FrexCore: resource installation removed.
  */
-function plugin_mod_install()
+
+function plugin_frexcore_install(): bool
 {
-    $brandManager = new BrandManager();
-    $brandManager->install();
     return true;
 }
 
-/**
- * Plugin uninstall process
- *
- * @return boolean
- */
-function plugin_mod_uninstall()
+function plugin_frexcore_uninstall(): bool
 {
-    $brandManager = new BrandManager();
-//    $brandManager->changeTitle("i-Vertix");
-    $brandManager->uninstall();
     return true;
 }
 
-function plugin_mod_activate()
+function plugin_frexcore_activate(): bool
 {
-    $brandManager = new BrandManager();
-    $currentTitle = BrandManager::getCurrentTitle();
-    if ($currentTitle === "GLPI") {
-        // Only overwrite if still the GLPI default (never customized)
-        $brandManager->changeTitle("i-Vertix");
-    }
-    foreach (array_keys(BrandManager::getImageResources()) as $resourceName) {
-        $brandManager->applyResource($resourceName);
-    }
-    $brandManager->applyLoginPageModifier();
+    return true;
 }
 
-function plugin_mod_deactivate()
+function plugin_frexcore_deactivate(): bool
 {
-    $brandManager = new BrandManager();
-//    $brandManager->changeTitle("i-Vertix");
-    foreach (array_keys(BrandManager::getImageResources()) as $resourceName) {
-        $brandManager->restoreResource($resourceName);
-    }
-    $brandManager->disableLoginPageModifier();
+    return true;
 }

@@ -1,96 +1,80 @@
-[<img src="readme/i-vertix.png">](https://i-vertix.com)
+# FrexCore plugin
 
-# UI Branding GLPI Plugin
+Dashboard cards and product naming for the FrexCore ITSM platform.
 
-This plugin is used to customize brand-related images of your GLPI instance.
+Derived from the [UI Branding plugin](https://github.com/i-Vertix/glpi-modifications)
+by i-Vertix/PGUM, whose structure this follows. GPLv3, as the original.
+Original copyright retained — see `COPYRIGHT`.
 
-## 📋 Functionalities
+## What it does
 
-- Customization of overall used brand logos (three different logo sizes)
-- Customization of the page title (shown in tab)
-- Add a background image to the login page
+**Dashboard cards and widget types.** Upstream ships numbers, bars, donuts
+and lines. What it has no shape for is a readable list — the thing people
+actually open a service desk to look at. Registered through the published
+`dashboard_types` and `dashboard_cards` hooks.
 
-## 📌 Information
+**Product naming**, via `$CFG_GLPI['app_name']` — the supported route, and
+cleaner than rewriting page titles in the response.
 
-This plugin got restructured completely to match GLPI 11 and (hopefully) its successors.
-The plugin initially emerged from
-[https://github.com/stdonato/glpi-modifications](https://github.com/stdonato/glpi-modifications)
-as the original author did not continue to support the original plugin.
-Since the plugin was forked from the original one, all of its code was rewritten and aligned to new GLPI guidelines.
+## What it deliberately does not do
 
-This plugin and its maintainers are not connected to the GLPI project.
+**It does not brand assets.** The original rewrote logo files inside the
+application tree, backing up the originals first. FrexCore applies brand
+assets from outside that tree instead, so an upgrade cannot revert them and
+there is nothing to restore on uninstall.
 
-## 📤 Migration from GLPI 10.x
+**It creates no database tables and writes no files.** Nothing to install,
+nothing to migrate, nothing left behind. Deactivating returns the platform to
+upstream's own cards with no cleanup step.
 
-Since the plugin is very lightweight and does not really do much (no database tables ecc.), we decided to **not have** a
-"real" migration (current custom images will be lost).
-If you want to reuse your customized images, please create a backup before installing
-the new version into the GLPI plugins folder. The images are located in `/var/www/html/glpi/plugins/mod/resources`.
-Additionally, please **remove the current backup directory** located in `/var/lib/glpi/_plugins/mod/backups`.
+**It overrides no core class.** Published hooks only.
 
-## 🔧 Installation
+## Failing soft
 
-> [!IMPORTANT]
-> For installation procedures of older versions, please have a look at the readme in the version-corresponding branch!
+The platform must survive this plugin breaking. That is the condition under
+which having a plugin at all was agreed (`docs/decisions/0003` in the
+platform repository), and it is a requirement rather than an aspiration:
 
-1. Download the latest version
-   from [https://github.com/i-Vertix/glpi-modifications/releases](https://github.com/i-Vertix/glpi-modifications/releases).
-2. Extract the archive into the GLPI `plugins` or `marketplace` folder, located in your glpi root directory (when updating, make sure to delete the current `mod` folder
-   first)
-3. The new folder inside of `plugins`/`marketplace` must be named `mod`
-4. The following additional permissions are **required** for the plugin to work properly (change `apache` to your webserver-related username):
+- Registration is wrapped; a failure during init logs and continues.
+- Every provider and renderer is wrapped. A card that throws costs one empty
+  tile, never the page — an operations dashboard that 500s because a chart
+  could not count something is worse than one missing a chart.
+- The GLPI version range is declared, so an unsupported release refuses to
+  activate rather than half-loading.
+- The nginx-level product naming in the platform repository stays
+  independent, so a plugin failure never hands a client an interface carrying
+  someone else's name.
 
-   In case you installed in `/plugins`:
-   
-   ```shell
-   chown -R apache: /var/www/html/glpi/public/pics
-   chown -R apache: /var/www/html/glpi/plugins/mod/resources
-   find /var/www/html/glpi/plugins/mod -type f -exec chmod 0644 {} \;
-   find /var/www/html/glpi/plugins/mod -type d -exec chmod 0755 {} \;
-   ```
-   
-   In case you installed in `marketplace`:
-   
-   ```shell
-   chown -R apache: /var/www/html/glpi/public/pics
-   chown -R apache: /var/www/html/glpi/marketplace/mod/resources
-   find /var/www/html/glpi/marketplace/mod -type f -exec chmod 0644 {} \;
-   find /var/www/html/glpi/marketplace/mod -type d -exec chmod 0755 {} \;
-   ```
+**The test:** with this plugin disabled, the platform runs, is patchable, and
+works on upstream's cards. If that stops being true, the plugin is wrong and
+gets changed until it is true again. One that cannot be switched off during
+an incident is a liability however useful it is the rest of the time.
 
-   All other required file permissions should already be given by a correct glpi installation (such as permissions in /var/lib ecc).
-   
-   In case you are using SELinux, you must verify that your apache/webserver user has the permission to `chmod` his own files (necessary to uninstall the plugin correctly).
-   With this command you can disable SELinux for apache/webserver-related stuff (to verify):
+## Entity scoping
 
-   ```shell
-   setsebool -P httpd_unified 1
-   ```
-   
-5. In case you migrated from GLPI 10 and created a backup of your customized images you can now move the image backups
-   to `/var/www/html/glpi/plugins/mod/resources/images` (or `/var/www/html/glpi/marketplace/mod/resources/images`)
-6. Log into GLPI with a super-admin account and install the plugin
-7. After the installation is completed, activate the plugin
+Card providers apply `getEntitiesRestrictCriteria`. Without it, a card on a
+shared instance shows one client's ticket subjects to another — the worst
+thing a multi-tenant dashboard can do. Any new provider must do the same;
+it is the first thing to check in review.
 
-## 👨‍🔧 Use the plugin
+## Install
 
-Access the UI Branding page from the *Configure* button on the list item of your plugin page.
+The plugin directory must be named `frexcore`:
 
-![UI Branding](./readme/ui-branding.png)
+```bash
+sudo git clone https://github.com/nimrodzw/glpi-customisation \
+    /srv/frexcore/tenants/<slug>/app/plugins/frexcore
+sudo chown -R frex-<slug>:frex-<slug> \
+    /srv/frexcore/tenants/<slug>/app/plugins/frexcore
+```
 
-This is the only page this plugin brings into your GLPI instance.
+Then Setup → Plugins → install, then activate.
 
-In case you want to revert to the original images, deactivate all entries under *Apply Modifications*.
-The rest is more or less self-explanatory.
+## Cards
 
-If you uninstall the plugin or disable it, all backups are restored automatically.
+| Card | Shape | Shows |
+|---|---|---|
+| Tickets needing attention | FrexCore: list | Open tickets, oldest first, with priority and how long each has waited |
 
-## 🗿 Uninstall
-
-Please uninstall the plugin from the GLPI plugins page before removing any plugin files!
-Otherwise, all backups of original files are lost.
-We do not take any credit for any loss of original files!
-
-## 📢 Notice
-
-The plugin is and will not be published on the GLPI marketplace.
+Oldest first is deliberate. Newest-first shows the work that has been waiting
+least, which is the opposite of useful on a morning when the desk is behind.

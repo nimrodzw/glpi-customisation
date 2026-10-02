@@ -1,20 +1,12 @@
 {
-    "require": {
-        "php": ">=8.2"
-    },
-    "require-dev": {
-        "glpi-project/tools": "^0.8"
-    },
+    "name": "frexcore/glpi-plugin",
+    "description": "FrexCore dashboard cards and product naming. Derived from UI Branding by i-Vertix/PGUM.",
+    "license": "GPL-3.0-or-later",
+    "require": { "php": ">=8.2" },
     "config": {
         "optimize-autoloader": true,
-        "platform": {
-            "php": "8.2.99"
-        },
+        "platform": { "php": "8.2.99" },
         "sort-packages": true
     },
-    "autoload": {
-        "psr-4": {
-            "GlpiPlugin\\Mod\\": "src"
-        }
-    }
+    "autoload": { "psr-4": { "GlpiPlugin\\Frexcore\\": "src" } }
 }

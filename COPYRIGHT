@@ -23,3 +23,16 @@ along with "UI Branding plugin for GLPI". If not, see <http://www.gnu.org/licens
 @license   GPLv3 https://www.gnu.org/licenses/gpl-3.0.html
 @link      https://github.com/i-Vertix/glpi-modifications
 -------------------------------------------------------------------------
+---
+
+Portions Copyright (C) 2026 FrexCore and contributors.
+
+This work is derived from the UI Branding plugin for GLPI by i-Vertix/PGUM
+(https://github.com/i-Vertix/glpi-modifications), whose structure and plugin
+scaffolding it follows. The original copyright above is retained in full.
+
+Modified 2026-10-02 by FrexCore:
+  - Asset branding removed. FrexCore applies brand assets outside the
+    application tree, so an upgrade cannot revert them.
+  - Dashboard cards and widget types added, registered through upstream's
+    published dashboard_types and dashboard_cards hooks.
