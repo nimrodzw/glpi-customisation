@@ -95,9 +95,17 @@ sudo -u frex-demo php /srv/frexcore/tenants/demo/app/bin/console \
     plugins:frexcore:seed-demo --purge
 ```
 
-Builds a believable organisation: branches across seven countries, twenty
-staff, a named server estate, categories carrying the regulation behind each
-one, and roughly a year of ticket history.
+Builds a running company, not a sample. Forty five staff across eight sites
+in seven countries, roughly one hundred and sixty assets with owners,
+warranties, purchase dates and book values, a licence register with seat
+counts and renewal dates, suppliers and contracts including data processing
+agreements, service level targets by priority, a knowledge base, open
+problems and changes, and a year of ticket history behind a live queue.
+
+A prospect clicks past the dashboard inside a minute. What decides the
+meeting is whether the next five screens hold up. Thin data behind a good
+dashboard is worse than no demo, because it teaches them the product is a
+shell.
 
 **Why a console command and not a .sql file.** Tickets are not one table.
 Actors live in `glpi_tickets_users`, solutions are their own records, and the

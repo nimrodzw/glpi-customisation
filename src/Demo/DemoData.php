@@ -254,6 +254,277 @@ final class DemoData
          'ZEBULUN is at 88 percent. Needs additional storage before the quarter end document load.', 2, true],
     ];
 
+    /**
+     * Name pools for the rest of the staff.
+     *
+     * Twenty named people cannot plausibly own ninety assets across eight
+     * branches, and a prospect who counts is exactly the prospect worth
+     * winning. These fill the gap so the headcount supports the estate.
+     */
+    public const MORE_FIRST = [
+        'Tatenda', 'Nyasha', 'Farai', 'Rutendo', 'Tinashe', 'Anesu', 'Panashe',
+        'Bongani', 'Sipho', 'Zanele', 'Mpho', 'Kagiso', 'Boitumelo', 'Oratile',
+        'Wanjiku', 'Kamau', 'Njeri', 'Otieno', 'Chidi', 'Ngozi', 'Emeka',
+        'Folake', 'Mutinta', 'Chanda', 'Lubasi',
+    ];
+
+    public const MORE_LAST = [
+        'Mapfumo', 'Chirwa', 'Mudenda', 'Gumbo', 'Masuku', 'Ndlovu', 'Shumba',
+        'Tshabalala', 'Mokoena', 'Radebe', 'Sithole', 'Mwale', 'Zulu',
+        'Kariuki', 'Omondi', 'Mwangi', 'Okafor', 'Balogun', 'Adebayo',
+        'Nkomo', 'Chigumba', 'Muchena', 'Simwanza', 'Kabwe', 'Lungu',
+    ];
+
+    // ============================================================
+    // The estate
+    //
+    // A prospect clicks past the dashboard within a minute. What decides
+    // the meeting is whether the next five screens hold up: whether assets
+    // have owners, warranties and purchase dates; whether licences have
+    // seat counts and renewal dates; whether contracts exist at all. Thin
+    // data behind a good dashboard is worse than no demo, because it
+    // teaches them the product is a shell.
+    // ============================================================
+
+    public const MANUFACTURERS = [
+        'Dell', 'HP', 'Lenovo', 'Cisco', 'Fortinet', 'Canon', 'APC',
+        'Microsoft', 'Veeam', 'Kaspersky', 'Ubiquiti', 'Yealink',
+    ];
+
+    public const STATES = [
+        'In use', 'In stock', 'Under repair', 'Awaiting disposal', 'Retired',
+    ];
+
+    public const OPERATING_SYSTEMS = [
+        'Windows 11 Pro', 'Windows 10 Pro', 'Windows Server 2022',
+        'Ubuntu Server 22.04 LTS', 'Red Hat Enterprise Linux 9',
+    ];
+
+    /** [model, manufacturer, type] */
+    public const COMPUTER_MODELS = [
+        ['Latitude 5540',    'Dell',    'Laptop'],
+        ['Latitude 7440',    'Dell',    'Laptop'],
+        ['ThinkPad T14',     'Lenovo',  'Laptop'],
+        ['EliteBook 840 G10','HP',      'Laptop'],
+        ['OptiPlex 7010',    'Dell',    'Desktop'],
+        ['ProDesk 400 G9',   'HP',      'Desktop'],
+        ['PowerEdge R650',   'Dell',    'Server'],
+        ['ProLiant DL380',   'HP',      'Server'],
+    ];
+
+    /** [model, manufacturer, is_colour, monthly_duty] */
+    public const PRINTER_MODELS = [
+        ['imageRUNNER C3226i', 'Canon', true,  8000],
+        ['imageRUNNER 2630i',  'Canon', false, 6000],
+        ['LaserJet M428fdw',   'HP',    false, 4000],
+        ['Color LaserJet M480','HP',    true,  5000],
+    ];
+
+    public const MONITOR_MODELS = [
+        ['P2422H',   'Dell'],
+        ['U2723QE',  'Dell'],
+        ['E24 G5',   'HP'],
+    ];
+
+    /** [model, manufacturer, role] */
+    public const NETWORK_MODELS = [
+        ['FortiGate 60F',       'Fortinet', 'Branch firewall'],
+        ['FortiGate 200F',      'Fortinet', 'Core firewall'],
+        ['Catalyst 9200-24P',   'Cisco',    'Access switch'],
+        ['Catalyst 9300-48P',   'Cisco',    'Core switch'],
+        ['UniFi U6-Pro',        'Ubiquiti', 'Wireless access point'],
+    ];
+
+    public const PHONE_MODELS = [
+        ['T31P', 'Yealink'],
+        ['T46U', 'Yealink'],
+    ];
+
+    /**
+     * Software and its licensing position.
+     *
+     * [name, publisher, version, licence type, seats, months until renewal]
+     *
+     * Renewal months are deliberately mixed. Two fall inside the next
+     * quarter, because a licence register where nothing is ever due proves
+     * nothing, and the renewal a client had forgotten is usually the moment
+     * the room goes quiet.
+     */
+    public const SOFTWARE = [
+        ['Microsoft 365 Business Premium', 'Microsoft', '2026',    'Subscription', 120, 2],
+        ['Windows Server Datacenter',      'Microsoft', '2022',    'Perpetual',     16, 0],
+        ['Kaspersky Endpoint Security',    'Kaspersky', '12.4',    'Subscription',  95, 1],
+        ['Veeam Backup and Replication',   'Veeam',     '12.1',    'Subscription',  16, 7],
+        ['Adobe Acrobat Pro',              'Microsoft', '2026',    'Subscription',  25, 5],
+        ['FortiGate UTM Support',          'Fortinet',  'FortiOS 7.4', 'Subscription', 8, 3],
+        ['Core Banking Platform',          'Microsoft', '9.2',     'Perpetual',    150, 0],
+        ['Sage Payroll',                   'Microsoft', '2026.1',  'Subscription',  12, 9],
+    ];
+
+    /** [name, what they supply] */
+    public const SUPPLIERS = [
+        ['Kopano IT Distributors',   'Hardware supply and warranty'],
+        ['Sable Networks',           'Connectivity and managed links'],
+        ['Mopane Technologies',      'Endpoint support and field services'],
+        ['Highveld Cloud Services',  'Hosting and backup, data processor'],
+        ['Chenai Secure Shredding',  'Certified media destruction'],
+    ];
+
+    /**
+     * Contracts.
+     *
+     * [name, supplier, type, months until renewal, notice period in days]
+     *
+     * The data processing agreements are the point. Under GDPR Article 28,
+     * POPIA and most African regimes a processor needs a written agreement,
+     * and an auditor asking to see them is an entirely ordinary Tuesday.
+     * Most buyers track them in a spreadsheet nobody has opened since the
+     * day it was made.
+     */
+    public const CONTRACTS = [
+        ['Hardware maintenance and warranty', 'Kopano IT Distributors',  'Maintenance',              8,  60],
+        ['Primary and backup connectivity',   'Sable Networks',          'Service',                  4,  90],
+        ['Endpoint support, all branches',    'Mopane Technologies',     'Support',                 11,  30],
+        ['Hosting and backup services',       'Highveld Cloud Services', 'Data processing agreement', 2, 90],
+        ['Certified media destruction',       'Chenai Secure Shredding', 'Data processing agreement', 6, 30],
+    ];
+
+    /**
+     * Response and resolution targets, by priority.
+     * [priority, name, respond within hours, resolve within hours]
+     */
+    public const SLA_TARGETS = [
+        [5, 'Critical',  1,   4],
+        [4, 'High',      2,   8],
+        [3, 'Medium',    4,  24],
+        [2, 'Low',       8,  48],
+        [1, 'Very low', 24,  72],
+    ];
+
+    /**
+     * Knowledge base.
+     *
+     * Half of these are service desk basics and half are the procedures a
+     * regulator asks to see. An article titled "Personal data breach: the
+     * first 24 hours" does more in a demo than any dashboard, because it
+     * answers the question the compliance officer in the room came with.
+     *
+     * [title, category, body]
+     */
+    public const KB_ARTICLES = [
+        ['Personal data breach: the first 24 hours', 'Privacy',
+         "1. Contain. Isolate the affected system or account. Do not delete anything, it is evidence.\n"
+         . "2. Record the clock. Note the time the breach was discovered. Under GDPR Article 33 the "
+         . "notification window to the supervisory authority is 72 hours from awareness, not from the incident.\n"
+         . "3. Raise a ticket under Privacy, Personal data breach. This starts the audit trail.\n"
+         . "4. Assess. What categories of personal data, how many people, and is harm likely?\n"
+         . "5. Decide on notification. The Data Protection Officer owns this decision, not IT.\n"
+         . "6. Notify affected people where the risk to them is high.\n"
+         . "7. Record the outcome even where you decide not to notify. The reasoning is part of the record."],
+
+        ['Handling a data subject access request', 'Privacy',
+         "A data subject may ask for a copy of everything held about them.\n\n"
+         . "Log it the day it arrives under Privacy, Data subject access request. The statutory clock starts "
+         . "on receipt, not on the day somebody notices the email.\n\n"
+         . "Verify identity before disclosing anything. Releasing a file to an impostor is itself a breach.\n\n"
+         . "Collect from every system, not only the obvious one: the core platform, email, the CRM, call "
+         . "recordings and paper files.\n\n"
+         . "Redact third parties. Another customer's details inside the file are not the requester's to receive."],
+
+        ['Reporting a suspected phishing email', 'Security',
+         "Do not click links or open attachments. Do not forward it to colleagues to ask what they think.\n\n"
+         . "Use the report button in the mail client, or raise a ticket under Security, Suspected phishing "
+         . "and attach the message as an attachment rather than pasting the text, so the headers survive.\n\n"
+         . "If you already clicked: say so immediately. Nobody is in trouble for reporting quickly, and the "
+         . "difference between an incident and a breach is usually how fast someone spoke up."],
+
+        ['Lost or stolen device: what to do', 'Security',
+         "Report it the same day, including out of hours, under Security, Lost or stolen device.\n\n"
+         . "Tell us whether the device was encrypted and whether it held customer data. Both decide whether "
+         . "this becomes a notifiable personal data breach.\n\n"
+         . "We will remote wipe where possible and revoke the device's access tokens.\n\n"
+         . "File a police report for stolen equipment. The reference is needed for insurance and for the "
+         . "incident record."],
+
+        ['Requesting access to a system or shared folder', 'Service',
+         "Raise a ticket under Account and access with the system, the folder, and what you need to do.\n\n"
+         . "Your line manager has to approve. Access is granted on the least needed to do the job, so ask "
+         . "for the role you need rather than the one a colleague has.\n\n"
+         . "Access to systems holding personal data carries a review date and will be revoked automatically "
+         . "if it is not reconfirmed."],
+
+        ['New starter: IT checklist', 'Service',
+         "Raise the request at least five working days before the start date.\n\n"
+         . "Tell us the role, the branch, the start date and the manager. The role decides the access "
+         . "profile, so getting it right the first time avoids a second round of approvals.\n\n"
+         . "Standard provision is an account, a mailbox, a laptop, core platform access at the level the "
+         . "role requires, and a desk phone where the role takes customer calls.\n\n"
+         . "Data protection induction is part of the first week and is tracked against this ticket."],
+
+        ['Leaver: offboarding checklist', 'Service',
+         "Notify IT as soon as a resignation is accepted, not on the last day.\n\n"
+         . "On the final day all access is revoked, including remote access, the core platform and any "
+         . "administrative accounts.\n\n"
+         . "The mailbox is delegated to the line manager for a defined period and then archived to the "
+         . "retention schedule.\n\n"
+         . "Equipment is returned, wiped and either reissued or sent for certified destruction. The "
+         . "destruction certificate is attached to the ticket, because an auditor will ask for it."],
+
+        ['Password and multi-factor authentication', 'Security',
+         "Use a long passphrase rather than a short complicated password. Length beats symbols.\n\n"
+         . "Never reuse a work password anywhere else.\n\n"
+         . "Multi-factor authentication is required for email, remote access and the core platform.\n\n"
+         . "If you receive an authentication prompt you did not trigger, deny it and report it. An "
+         . "unexpected prompt usually means somebody already has your password."],
+
+        ['Printing a policy schedule at the counter', 'Service',
+         "Select the counter printer for the branch rather than the default.\n\n"
+         . "If the job does not appear, check the queue before resending. Repeated sends are the most "
+         . "common cause of a jam while a customer is waiting.\n\n"
+         . "Documents containing customer data must not be left on the printer. Use secure release where "
+         . "the branch has it."],
+
+        ['Requesting a change to a live system', 'Service',
+         "Raise a change request with what is changing, why, when, and what happens if it goes wrong.\n\n"
+         . "Changes touching the card data environment or any system holding personal data need review "
+         . "before approval, not after.\n\n"
+         . "Every change needs a back-out plan. A change nobody can reverse is an outage with a schedule."],
+    ];
+
+    /** [title, description, linked category] */
+    public const PROBLEMS = [
+        ['Core banking slows every weekday morning',
+         'Repeated incidents between 08:00 and 09:30 across all branches. Suspected contention on the database '
+         . 'replica during the overnight batch overrun. Workaround is to stagger branch opening reports.',
+         'Core banking application'],
+        ['Branch wireless drops on the second floor, Harare',
+         'Multiple incidents over six weeks in the same area. Access point coverage appears insufficient since '
+         . 'the floor was reorganised. Permanent fix requires an additional access point.',
+         'Network and connectivity'],
+        ['Shared mailboxes intermittently reject external mail',
+         'Recurring across the claims and underwriting shared mailboxes. Correlates with sender reputation '
+         . 'changes after the domain record update.',
+         'Email and collaboration'],
+    ];
+
+    /** [title, description, linked category] */
+    public const CHANGES = [
+        ['Add a second wireless access point, Harare second floor',
+         'Permanent fix for the recurring wireless problem. Requires a cabling run and a short outage on the '
+         . 'floor switch outside business hours.',
+         'Change request'],
+        ['Move the overnight batch window',
+         'Shift the batch to complete before 06:00 so it no longer overruns into branch opening. Needs sign off '
+         . 'from Finance and Operations.',
+         'Change request'],
+        ['Increase storage on the document management server',
+         'ZEBULUN is at 88 percent. Add storage before the quarter end document load.',
+         'Change request'],
+        ['Annual disaster recovery test for the core platform',
+         'Recovery test to evidence the recovery time objective. Internal Audit have asked for the result.',
+         'Change request'],
+    ];
+
     /** Resolutions, so closed tickets do not all read the same. */
     public const RESOLUTIONS = [
         'Resolved and confirmed with the requester. No further action.',
