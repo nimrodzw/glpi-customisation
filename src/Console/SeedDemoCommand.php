@@ -38,6 +38,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 class SeedDemoCommand extends AbstractCommand
 {
     private bool $dry = false;
+    private string $demoPassword = '';
+    private array $slaByPriority = [];
     private int $entity = 0;
     private array $made = [];
 
@@ -57,6 +59,9 @@ class SeedDemoCommand extends AbstractCommand
             'Remove previously seeded demo records and stop');
         $this->addOption('force', null, InputOption::VALUE_NONE,
             'Proceed even though this instance already holds tickets');
+        $this->addOption('password', null, InputOption::VALUE_REQUIRED,
+            'Password set on every demonstration account, so the end-user view can be shown',
+            'FrexCoreDemo2026!');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -65,6 +70,7 @@ class SeedDemoCommand extends AbstractCommand
         global $CFG_GLPI;
 
         $this->dry = (bool) $input->getOption('dry-run');
+        $this->demoPassword = (string) $input->getOption('password');
         $org       = (string) $input->getOption('org');
         $target    = max(20, (int) $input->getOption('tickets'));
 
@@ -115,6 +121,7 @@ class SeedDemoCommand extends AbstractCommand
         $this->step($output, 'policy documents', fn() => $this->seedDocuments());
         $this->step($output, 'software and licensing', fn() => $this->seedSoftware($ref));
         $this->step($output, 'suppliers and contracts', fn() => $this->seedContracts());
+        // Before tickets: the ticket phase reads the map this builds.
         $this->step($output, 'service level targets', fn() => $this->seedSla());
         $this->step($output, 'knowledge base', fn() => $this->seedKnowledge());
         $this->step($output, 'problems and changes', fn() => $this->seedProblemsChanges($categories));
@@ -134,6 +141,18 @@ class SeedDemoCommand extends AbstractCommand
         foreach ($this->made as $what => $n) {
             $output->writeln(sprintf('  %-26s %d', $what, $n));
         }
+        $output->writeln('');
+        if (!$this->dry) {
+            $output->writeln('');
+            $output->writeln('  <info>Demonstration sign-ins</info>');
+            $output->writeln('    end user     rejoice.moyo    ' . $this->demoPassword);
+            $output->writeln('    technician   tendai.mukwena  ' . $this->demoPassword);
+            $output->writeln('    every seeded account uses the same password');
+            $output->writeln('');
+            $output->writeln('  <comment>These are demonstration accounts on a demonstration tenant.</comment>');
+            $output->writeln('  <comment>Never seed an instance holding real client data.</comment>');
+        }
+
         $output->writeln('');
         $output->writeln($this->dry
             ? '  <comment>Dry run. Nothing was written. Re-run without --dry-run to apply.</comment>'
@@ -341,6 +360,11 @@ class SeedDemoCommand extends AbstractCommand
                 'entities_id'         => $this->entity,
                 'is_active'           => 1,
                 'comment'             => DemoData::MARKER,
+                // Without a password these accounts cannot sign in, and the
+                // end-user view is the half of the product the client's own
+                // staff will actually live in.
+                'password'            => $this->demoPassword,
+                'password2'           => $this->demoPassword,
             ], ['name']);
 
             if ($id > 0 && !$this->dry) {
@@ -502,7 +526,11 @@ class SeedDemoCommand extends AbstractCommand
 
         // Phase two: the queue as it stands this morning.
         for ($i = 0; $i < $openWanted; $i++) {
-            $daysAgo = (int) floor(((1 - ($i / max(1, $openWanted))) ** 1.6) * 9);
+            // Tighter than before, now that tickets carry a real resolution
+            // target. A healthy desk has most of its open work under a day;
+            // stretching the queue over nine days while attaching a 24 hour
+            // target would show almost everything in breach.
+            $daysAgo = (int) floor(((1 - ($i / max(1, $openWanted))) ** 2.2) * 4);
             $made   += $this->makeTicket($histWanted + $i, $daysAgo, false, $staff, $agents, $categories);
         }
 
@@ -567,11 +595,16 @@ class SeedDemoCommand extends AbstractCommand
             $solveIn = random_int(1800, 3 * 86400);
             $upd['solvedate'] = date('Y-m-d H:i:s', $opened + $solveIn);
             $upd['closedate'] = date('Y-m-d H:i:s', $opened + $solveIn + random_int(600, 86400));
-            $upd['date_mod']  = $upd['closedate'];
+            $upd['date_mod']    = $upd['closedate'];
+            $upd['slas_id_ttr'] = max(0, $this->slaByPriority[$urgency] ?? 0);
+            // Resolved comfortably inside target, which is the point of
+            // showing it: the record demonstrates the desk met its promise.
+            $upd['time_to_resolve'] = date('Y-m-d H:i:s', $opened + $solveIn + random_int(3600, 7200));
         } else {
             // A board showing no breaches fails to demonstrate the one thing a
             // service desk is bought to prevent; a board showing nothing but
             // breaches describes an organisation nobody wants to copy.
+            $upd['slas_id_ttr'] = max(0, $this->slaByPriority[$urgency] ?? 0);
             $upd['time_to_resolve'] = random_int(1, 100) <= 15
                 ? date('Y-m-d H:i:s', $now - random_int(3600, 2 * 86400))
                 : date('Y-m-d H:i:s', $now + (($urgency >= 4 ? random_int(2, 10) : random_int(12, 72)) * 3600));
@@ -1013,6 +1046,20 @@ class SeedDemoCommand extends AbstractCommand
                     'definition_time' => 'hour',
                     'comment'         => "Priority {$priority}: {$word} within {$hours} hours. " . DemoData::MARKER,
                 ], ['name', 'slms_id']);
+
+                // Remember the resolution target per priority so tickets can
+                // carry one. A service desk demo where no ticket has an SLA
+                // fails the first question every buyer asks.
+                if ($type === \SLM::TTR) {
+                    $this->slaByPriority[$priority] = $this->ensure(\SLA::class, [
+                        'name'            => "{$label} {$word}",
+                        'slms_id'         => $slm,
+                        'entities_id'     => $this->entity,
+                        'type'            => $type,
+                        'number_time'     => $hours,
+                        'definition_time' => 'hour',
+                    ], ['name', 'slms_id']);
+                }
                 $this->tally('service level targets');
             }
         }
