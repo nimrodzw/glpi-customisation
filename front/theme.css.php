@@ -27,6 +27,8 @@ use GlpiPlugin\Frexcore\Settings;
 // must not assume a session. It reads configuration and writes CSS; it is
 // deliberately incapable of doing anything else.
 
+global $CFG_GLPI;
+
 $s = Settings::all();
 
 $primary = $s['colour_primary'];
@@ -48,7 +50,17 @@ $sidebar = match ($s['sidebar_style']) {
 [$padY, $padX] = $s['density'] === 'comfortable' ? ['.5rem', '.75rem'] : ['.3rem', '.55rem'];
 [$radius, $radiusLg] = $s['corner_style'] === 'soft' ? ['6px', '8px'] : ['2px', '3px'];
 
-$assets = \Plugin::getWebDir('frexcore', false) . '/front/asset.php?name=';
+/**
+ * The plugin's own URL prefix.
+ *
+ * Built from root_doc rather than with Plugin::getWebDir(), which returns a
+ * path with no leading slash when asked for a relative one. A browser
+ * resolves that against the current directory, so a link from a page already
+ * under /plugins/frexcore/front/ came out as
+ * /plugins/frexcore/front/plugins/frexcore/front/... and 404'd. GLPI 11 also
+ * marks that helper deprecated and says to use the /plugins/ path directly.
+ */
+$assets = ($CFG_GLPI['root_doc'] ?? '') . '/plugins/frexcore/front/asset.php?name=';
 $v      = '&v=' . Settings::hash();
 
 $css = [];

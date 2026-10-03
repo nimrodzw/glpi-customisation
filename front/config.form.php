@@ -20,7 +20,20 @@ use GlpiPlugin\Frexcore\Settings;
 
 Session::checkRight('config', READ);
 
-$self = Plugin::getWebDir('frexcore', false) . '/front/config.form.php';
+global $CFG_GLPI;
+
+/**
+ * The plugin's own URL prefix.
+ *
+ * Built from root_doc rather than with Plugin::getWebDir(), which returns a
+ * path with no leading slash when asked for a relative one. A browser
+ * resolves that against the current directory, so a link from a page already
+ * under /plugins/frexcore/front/ came out as
+ * /plugins/frexcore/front/plugins/frexcore/front/... and 404'd. GLPI 11 also
+ * marks that helper deprecated and says to use the /plugins/ path directly.
+ */
+$base = ($CFG_GLPI['root_doc'] ?? '') . '/plugins/frexcore';
+$self = $base . '/front/config.form.php';
 
 /** Escape for HTML. Everything below goes through it, without exception. */
 $e = static fn($v): string => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
@@ -204,7 +217,7 @@ echo '<p style="font-size:.75rem;color:#7b8899;">PNG, JPEG, GIF, WebP or SVG, up
    . 'Files are stored outside the application tree, so an upgrade cannot revert them. '
    . 'Leave a field empty to keep what is already there.</p>';
 
-$assetBase = Plugin::getWebDir('frexcore', false) . '/front/asset.php?name=';
+$assetBase = $base . '/front/asset.php?name=';
 $hash      = Settings::hash();
 
 foreach (Settings::IMAGE_KEYS as $key => [$label, $help]) {
