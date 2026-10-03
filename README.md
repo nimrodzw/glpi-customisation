@@ -16,6 +16,9 @@ actually open a service desk to look at. Registered through the published
 **Product naming**, via `$CFG_GLPI['app_name']` — the supported route, and
 cleaner than rewriting page titles in the response.
 
+**A settings panel**, reached from the cog beside FrexCore on the plugins
+page. See below.
+
 ## What it deliberately does not do
 
 **It does not brand assets.** The original rewrote logo files inside the
@@ -23,9 +26,15 @@ application tree, backing up the originals first. FrexCore applies brand
 assets from outside that tree instead, so an upgrade cannot revert them and
 there is nothing to restore on uninstall.
 
-**It creates no database tables and writes no files.** Nothing to install,
-nothing to migrate, nothing left behind. Deactivating returns the platform to
-upstream's own cards with no cleanup step.
+**It creates no database tables.** Settings live in the application's own
+configuration table under a context of our own, so there is nothing to
+install and nothing to migrate. Uninstalling deletes those rows and the
+instance returns to the defaults compiled into the stylesheet.
+
+**It writes nothing into the application tree.** Uploaded brand images go to
+the plugin data directory outside it, which is what stops an upgrade
+reverting them — the failure mode that made the original plugin's approach
+untenable. Uninstalling removes them.
 
 **It overrides no core class.** Published hooks only.
 
@@ -69,6 +78,58 @@ sudo chown -R frex-<slug>:frex-<slug> \
 ```
 
 Then Setup → Plugins → install, then activate.
+
+## Settings panel
+
+Everything a tenant is allowed to differ on, in one form, with no file to
+edit, no repository to pull and no web server to reload.
+
+| Setting | What it reaches |
+|---|---|
+| Product name | Wherever the application names itself |
+| Brand, brand darker, accent | Sidebar, buttons, links, focus, active state |
+| Sidebar | Gradient, solid or near black |
+| Density | Row height and type size across every list |
+| Corners | Square or soft, everywhere at once |
+| Activity stream | Single column, or the base theme's two-sided thread |
+| Favourite menu items | On or off |
+| Queue card rows | How many tickets the attention card lists |
+| Brand images | Wide logo, square mark, sign-in logo, sign-in background |
+| Demonstration banner | A fixed strip, with its text |
+
+**Why this exists.** FrexCore runs one isolated instance per client. Without
+a panel, giving a new client their colours is a stylesheet edit, a commit, a
+pull on the server and an nginx reload — a deployment, for something a client
+will ask to change twice in the first week, and one that cannot be delegated
+to anyone who is not comfortable on a command line.
+
+**Hover, tint and focus colours are derived**, not set. Three colours go in
+and the rest are computed from them. Offering ten pickers produces a palette
+that drifts out of relation to itself within a few changes, and the person
+using the panel is not being asked to be a designer.
+
+**What is deliberately not configurable.** Hiding the upstream project links
+is fixed in the stylesheet and absent from the panel. It is served by nginx
+from outside the application tree so that a plugin failure can never hand a
+client an interface carrying someone else's name — and a white-label
+guarantee with an off switch in the interface is not a guarantee.
+
+**Division of labour with the stylesheet.** `frexcore.css` carries the
+structure and ships with a default for every value the panel can change, so
+an instance with this plugin switched off still gets the whole theme rather
+than a half-painted one. The panel emits only the overrides, at one step more
+specific than the base, so it wins whichever order the two files arrive in.
+The one exception is the activity stream, which is the only place the theme
+rearranges the page rather than recolouring it; that lives here, because it
+is an operator's choice.
+
+**Validation is not politeness.** These values are interpolated into a
+stylesheet served to every page. A colour that is not a colour is a hole, not
+a typo, so colours are matched against a pattern, choices against the list
+offered, and the product name is stripped. Uploads are typed by their leading
+bytes rather than by their name or the browser's claim, and an uploaded SVG
+is served under a sandbox policy, because an SVG is a document that can carry
+script and it is being served from the application's own origin.
 
 ## Cards
 
@@ -179,3 +240,10 @@ migration rather than a default nobody chose.
 
 Storage can be absent or throw, in private windows and where site data is
 blocked, so every read and write is guarded and the menu works without it.
+
+**The stylesheet and script live under `public/`.** GLPI 11 serves plugin
+files over HTTP only from a plugin's `public/` directory, or from `/ajax`,
+`/front` and `/report`. They were at the plugin root, which is none of those,
+so on 11.0.10 they were requested and not served and the feature was silently
+absent. The registered paths are unchanged, because the URL
+`/plugins/frexcore/css/favourites.css` is resolved against `public/` already.

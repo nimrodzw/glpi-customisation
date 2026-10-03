@@ -121,7 +121,14 @@ class Dashboard
      */
     public static function provideOpenTickets(array $params = []): array
     {
-        $defaults = ['label' => null, 'icon' => 'ti ti-ticket', 'limit' => 8];
+        // The row count is a setting rather than a constant: how many rows
+        // read as the morning's work differs between a two person desk and a
+        // twenty person one, and neither should need a deployment to change.
+        $defaults = [
+            'label' => null,
+            'icon'  => 'ti ti-ticket',
+            'limit' => max(3, min(40, (int) Settings::get('queue_rows'))),
+        ];
         $params   = array_merge($defaults, $params);
 
         $rows = [];
